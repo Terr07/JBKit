@@ -156,72 +156,64 @@ void PrintInstrInfo(const ClassFile::Instruction& instr)
   }
 }
 
-void PrintClassInfo(const ClassFile::ClassFile& cf)
+void PrintConstPool(const ClassFile::ConstantPool& cp)
 {
-  std::cout << "Magic number: 0x" << std::uppercase << std::hex
-            << cf.Magic << '\n' << std::nouppercase << std::dec;
 
-  std::cout << "Classfile version: " 
-            << cf.MajorVersion << '.' << cf.MinorVersion << '\n';
+  std::cout << "Const pool entries: " 
+    << cp.GetSize()<< '\n';
 
-  std::cout << "Const pool size: " 
-            << cf.ConstPool.GetSize()<< '\n';
+  if(!PrintDetails)
+    return;
 
-  if(PrintDetails)
+
+  for(auto i{1}; i < cp.GetCount(); i++)
   {
-    for(auto i{0}; i < cf.ConstPool.GetSize(); i++)
-    {
-      if(cf.ConstPool[i] == nullptr)
-        continue;
+    if(cp[i] == nullptr)
+      continue;
 
-      std::cout << "  ";
+    std::cout << "  ";
 
-      PrintConstInfo(i, *cf.ConstPool[i], cf.ConstPool);
-    }
+    PrintConstInfo(i, *cp[i], cp);
 
-    std::cout << "\n";
+    if(i+1 == cp.GetCount())
+      std::cout << "\n";
   }
 
+}
+
+void PrintFlags(const ClassFile::ClassFile& cf)
+{
   std::cout << "Access flags: 0x" << std::uppercase << std::hex
-            << cf.AccessFlags << std::nouppercase << std::dec;
+    << cf.AccessFlags << std::nouppercase << std::dec;
+
+  auto flagStrings = GetClassFlags(cf.AccessFlags);
+
+  if(flagStrings.size() == 0)
+  {
+    std::cout << '\n';
+    return;
+  }
 
   std::cout << " (";
+
+  for(auto i = 0u; i < flagStrings.size(); i++)
   {
-    auto flagStrings = GetClassFlags(cf.AccessFlags);
+    std::cout << flagStrings[i];
 
-    for(auto i = 0u; i < flagStrings.size(); i++)
-    {
-      std::cout << flagStrings[i];
-
-      if(i+1 != flagStrings.size())
-        std::cout << ", ";
-    }
+    if(i+1 != flagStrings.size())
+      std::cout << ", ";
   }
+
   std::cout << ")\n";
+}
 
-  std::cout << "ThisClass: ";
-  std::cout << cf.ConstPool.GetConstNameOrTypeStr(cf.ThisClass) << '\n';
-
-  std::cout << "SuperClass: ";
-  std::cout << cf.ConstPool.GetConstNameOrTypeStr(cf.SuperClass) << '\n';
-
-  std::cout << "Interfaces count: " << cf.Interfaces.size();
-
-  if(PrintDetails)
-  {
-    for(size_t i = 0; i < cf.Interfaces.size(); i++)
-    {
-      std::cout << "\n  Interfaces[" << i << "] = " <<cf.Interfaces[i];
-    }
-  }
-
-  std::cout << "\n";
-
-  std::cout << "\nMethods:\n";
+void PrintMethods(const ClassFile::ClassFile& cf)
+{
+  std::cout << "Methods: " << cf.Methods.size();
 
   for(const auto& method : cf.Methods)
   {
-    std::cout << "  ";
+    std::cout << "\n  ";
     std::cout << cf.ConstPool.GetConstNameOrTypeStr(method.DescriptorIndex);
     std::cout << " - ";
     std::cout << cf.ConstPool.GetConstNameOrTypeStr(method.NameIndex);
@@ -239,38 +231,42 @@ void PrintClassInfo(const ClassFile::ClassFile& cf)
 
     std::cout << "]";
 
-    if(PrintDetails)
+    if(!PrintDetails)
+      continue;
+
+    for(size_t i = 0; i < method.Attributes.size(); i++)
     {
-      for(size_t i = 0; i < method.Attributes.size(); i++)
+      if(method.Attributes[i] == nullptr)
+        continue;
+
+      if(method.Attributes[i]->GetType() != ClassFile::AttributeInfo::Type::Code)
+        continue;
+
+      const auto& codeAttr = static_cast<const ClassFile::CodeAttribute&>(*method.Attributes[i]);
+
+      for(size_t j = 0; j < codeAttr.Code.size(); j++)
       {
-        if(method.Attributes[i] == nullptr)
-          continue;
+        if(j == 0)
+          std::cout << ":\n";
 
-        if(method.Attributes[i]->GetType() != ClassFile::AttributeInfo::Type::Code)
-          continue;
-
-        const auto& codeAttr = static_cast<const ClassFile::CodeAttribute&>(*method.Attributes[i]);
-
-        for(size_t j = 0; j < codeAttr.Code.size(); j++)
-        {
-          if(j == 0)
-            std::cout << ":\n";
-
-          std::cout << "    ";
-          PrintInstrInfo(*codeAttr.Code[j]);
-        }
-
+        std::cout << "    ";
+        PrintInstrInfo(*codeAttr.Code[j]);
       }
+
     }
 
     std::cout << "\n";
   }
 
-  std::cout << "\nFields:\n";
+}
+
+void PrintFields(const ClassFile::ClassFile& cf)
+{
+  std::cout << "\nFields: " << cf.Fields.size();
 
   for(const auto& field : cf.Fields)
   {
-    std::cout << "  ";
+    std::cout << "\n  ";
     std::cout << cf.ConstPool.GetConstNameOrTypeStr(field.NameIndex);
     std::cout << "(";
 
@@ -287,9 +283,45 @@ void PrintClassInfo(const ClassFile::ClassFile& cf)
 
     std::cout << "): ";
     std::cout << cf.ConstPool.GetConstNameOrTypeStr(field.DescriptorIndex);
-    std::cout << "\n";
   }
 
+  std::cout << "\n";
+}
+
+void PrintClassInfo(const ClassFile::ClassFile& cf)
+{
+  std::cout << "Magic number: 0x" << std::uppercase << std::hex
+    << cf.Magic << '\n' << std::nouppercase << std::dec;
+
+  std::cout << "Classfile version: " 
+    << cf.MajorVersion << '.' << cf.MinorVersion << '\n';
+
+  PrintConstPool(cf.ConstPool);
+  PrintFlags(cf);
+
+  std::cout << "ThisClass: ";
+  std::cout << cf.ConstPool.GetConstNameOrTypeStr(cf.ThisClass) << '\n';
+
+  std::cout << "SuperClass: ";
+  std::cout << cf.ConstPool.GetConstNameOrTypeStr(cf.SuperClass) << '\n';
+
+  std::cout << "Interfaces count: " << cf.Interfaces.size();
+
+  if(PrintDetails)
+  {
+    for(size_t i = 0; i < cf.Interfaces.size(); i++)
+    {
+      std::cout << "\n  Interfaces[" << i << "] = " <<cf.Interfaces[i];
+
+      if(i+1 == cf.Interfaces.size())
+        std::cout << '\n';
+    }
+  }
+
+  std::cout << '\n';
+
+  PrintMethods(cf);
+  PrintFields(cf);
 
 }
 

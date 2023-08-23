@@ -44,12 +44,6 @@ CPInfo::Type CPInfo::GetType() const
   return this->m_type;
 }
 
-ConstantPool::ConstantPool(U16 n) 
-{
-  //constants use 1 based indexing, so we ignore the 0th index
-  m_pool.emplace_back( std::unique_ptr<CPInfo>{nullptr} );
-}
-
 void ConstantPool::Reserve(U16 n) 
 {
   m_pool.reserve(n);
@@ -57,32 +51,33 @@ void ConstantPool::Reserve(U16 n)
 
 std::string_view ConstantPool::GetConstNameOrTypeStr(U16 index) const
 {
-  auto ptr = m_pool[index].get();
+  const auto* ptr = (*this)[index];
 
   if(ptr == nullptr)
-    return "UNINITIALIZED";
+    return "???";
 
   if(ptr->GetType() == CPInfo::Type::UTF8)
   {
-    auto utf8Info = static_cast<UTF8Info*>(ptr);
+    auto utf8Info = static_cast<const UTF8Info*>(ptr);
     return utf8Info->String;
   }
 
   if(ptr->GetType() == CPInfo::Type::String)
   {
-    auto stringInfo = static_cast<StringInfo*>(ptr);
+    auto stringInfo = static_cast<const StringInfo*>(ptr);
     return this->GetConstNameOrTypeStr(stringInfo->StringIndex);
   }
 
   if(ptr->GetType() == CPInfo::Type::Class)
   {
-    auto classInfo = static_cast<ClassInfo*>(ptr);
+    auto classInfo = static_cast<const ClassInfo*>(ptr);
     return this->GetConstNameOrTypeStr(classInfo->NameIndex);
   }
 
   //TODO: implement for more types
 
-  return "";
+  assert(false);
+  return "???";
 }
 
 void ConstantPool::Add(std::unique_ptr<CPInfo>&& info) 
@@ -103,6 +98,24 @@ U16 ConstantPool::GetSize() const
 U16 ConstantPool::GetCount() const
 {
   return this->GetSize() + 1;
+}
+
+CPInfo* ConstantPool::operator[](U16 index) 
+{
+  --index;
+  if(index > this->GetSize())
+    return nullptr;
+
+  return m_pool[index].get();
+}
+
+const CPInfo* ConstantPool::operator[](U16 index) const
+{
+  --index;
+  if(index > this->GetSize())
+    return nullptr;
+
+  return m_pool[index].get();
 }
 
 } //namespace ClassFile

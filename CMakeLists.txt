@@ -16,6 +16,6 @@ target_include_directories(libClassFile PRIVATE "src")
 target_include_directories(libClassFile PUBLIC "include")
 
 
-add_executable(classinfo "example/classinfo.cpp")
-target_link_libraries(classinfo PUBLIC libClassFile)
+add_executable(readclass "example/readclass.cpp")
+target_link_libraries(readclass PUBLIC libClassFile)
 

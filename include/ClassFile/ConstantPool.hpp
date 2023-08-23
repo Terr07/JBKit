@@ -139,7 +139,6 @@ struct InvokeDynamicInfo : public CPInfo
 class ConstantPool
 {
   public:
-    ConstantPool(U16 n=0);
     void Reserve(U16 n);
 
     //Returns either the name of the constant, if the given const type has a 
@@ -178,15 +177,8 @@ class ConstantPool
       return *ptr;
     }
 
-    CPInfo* operator[](U16 index)
-    {
-      return m_pool[index].get();
-    }
-
-    const CPInfo* operator[](U16 index) const
-    {
-      return m_pool[index].get();
-    }
+    CPInfo* operator[](U16 index);
+    const CPInfo* operator[](U16 index) const;
 
     U16 GetSize() const;
     U16 GetCount() const;
