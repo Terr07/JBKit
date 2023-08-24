@@ -5,6 +5,7 @@
 #include <fstream>
 #include <map>
 #include <exception>
+#include <set>
 
 namespace Jasmin
 {
@@ -14,6 +15,7 @@ struct Lexeme
   enum LexType
   {
     Symbol,
+    Keyword,
     String,
     Number,
     ArithmeticOperator,
@@ -33,6 +35,7 @@ struct Lexeme
     static std::map<LexType, std::string_view> names =
     {
       {LexType::Symbol,             "Symbol"},
+      {LexType::Keyword,            "Keyword"},
       {LexType::String,             "String"},
       {LexType::Number,             "Number"},
       {LexType::ArithmeticOperator, "ArithmeticOperator"},
@@ -147,10 +150,12 @@ class Lexer
         return {Lexeme::LexType::Number, numStr};
       }
 
-
       //TODO: while alphanumerical
       std::string str;
       inputStream >> str;
+
+      if(isKeyword(str))
+        return {Lexeme::LexType::Keyword, str};
 
       return {Lexeme::LexType::Symbol, str};
     }
@@ -167,6 +172,27 @@ class Lexer
 
   private:
     std::ifstream inputStream;
+
+    bool isKeyword(std::string_view str)
+    {
+      std::set<std::string_view> keywords = 
+      {
+        "public",
+        "private",
+        "protected",
+        "static",
+        "volatile",
+        "transient",
+        "final",
+        "super",
+        "interface",
+        "abstract",
+        "native",
+        "synchronized",
+      };
+
+      return keywords.find(str) != keywords.end();
+    }
 
 };
 
