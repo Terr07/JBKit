@@ -1,30 +1,25 @@
 #pragma once
 
-#include <string_view>
-#include <vector>
-#include <fstream>
-#include <map>
-#include <exception>
-#include <set>
+#include "Common.hpp"
 
 namespace Jasmin
 {
+enum LexType
+{
+  Symbol,
+  Keyword,
+  String,
+  Number,
+  ArithmeticOperator,
+  Newline,
+  Colon,
+  Dot,
+  END
+};
 
 struct Lexeme
 {
-  enum LexType
-  {
-    Symbol,
-    Keyword,
-    String,
-    Number,
-    ArithmeticOperator,
-    Newline,
-    Colon,
-    Dot,
-    END
-  } Type;
-
+  LexType Type;
   std::string Value;
 
   Lexeme(LexType type, std::string val): Type{type}, Value{val} {}
@@ -32,7 +27,7 @@ struct Lexeme
 
   std::string_view GetTypeString() const
   {
-    static std::map<LexType, std::string_view> names =
+    static std::unordered_map<LexType, std::string_view> names =
     {
       {LexType::Symbol,             "Symbol"},
       {LexType::Keyword,            "Keyword"},
@@ -100,16 +95,16 @@ class Lexer
       }
 
       if(ch == '.')
-        return {Lexeme::LexType::Dot, inputStream.get()};
+        return {LexType::Dot, inputStream.get()};
 
       if(ch == ':')
-        return {Lexeme::LexType::Colon, inputStream.get()};
+        return {LexType::Colon, inputStream.get()};
 
       if(ch == '\n')
-        return {Lexeme::LexType::Newline, inputStream.get()};
+        return {LexType::Newline, inputStream.get()};
 
       if(ch == '+' || ch == '-' || ch == '/' || ch == '*')
-        return {Lexeme::LexType::ArithmeticOperator, inputStream.get()};
+        return {LexType::ArithmeticOperator, inputStream.get()};
 
       if(ch == '"')
       {
@@ -129,7 +124,7 @@ class Lexer
           str += ch;
         }
 
-        return {Lexeme::LexType::String, str};
+        return {LexType::String, str};
       }
 
       if(std::isdigit(ch))
@@ -147,7 +142,7 @@ class Lexer
           numStr += inputStream.get();
         }
 
-        return {Lexeme::LexType::Number, numStr};
+        return {LexType::Number, numStr};
       }
 
       //TODO: while alphanumerical
@@ -155,9 +150,9 @@ class Lexer
       inputStream >> str;
 
       if(isKeyword(str))
-        return {Lexeme::LexType::Keyword, str};
+        return {LexType::Keyword, str};
 
-      return {Lexeme::LexType::Symbol, str};
+      return {LexType::Symbol, str};
     }
 
     std::vector<Lexeme> LexAll()
@@ -175,7 +170,7 @@ class Lexer
 
     bool isKeyword(std::string_view str)
     {
-      std::set<std::string_view> keywords = 
+      static std::unordered_set<std::string_view> keywords = 
       {
         "public",
         "private",
