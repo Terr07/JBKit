@@ -54,6 +54,8 @@ class Lexer
 
     bool HasMore() 
     {
+      skipWhitespace();
+      skipComments();
       return inputStream.peek() != EOF;
     }
 
