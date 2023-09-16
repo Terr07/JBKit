@@ -4,39 +4,38 @@
 
 namespace Jasmin
 {
-enum LexType
-{
-  Symbol,
-  Keyword,
-  String,
-  Number,
-  ArithmeticOperator,
-  Newline,
-  Colon,
-  Dot,
-  END
-};
 
 struct Lexeme
 {
-  LexType Type;
+  enum class TokenType
+  {
+    Symbol,
+    Keyword,
+    StringLiteral,
+    NumberLiteral,
+    ArithmeticOperator,
+    Newline,
+    Colon,
+    Dot,
+  } Type;
+
   std::string Value;
 
-  Lexeme(LexType type, std::string val): Type{type}, Value{val} {}
-  Lexeme(LexType type, int val): Type{type}, Value{static_cast<char>(val)} {}
+  Lexeme(TokenType type, std::string val): Type{type}, Value{val} {}
+  Lexeme(TokenType type, int val): Type{type}, Value{static_cast<char>(val)} {}
 
   std::string_view GetTypeString() const
   {
-    static std::unordered_map<LexType, std::string_view> names =
+    static std::unordered_map<TokenType, std::string_view> names =
     {
-      {LexType::Symbol,             "Symbol"},
-      {LexType::Keyword,            "Keyword"},
-      {LexType::String,             "String"},
-      {LexType::Number,             "Number"},
-      {LexType::ArithmeticOperator, "ArithmeticOperator"},
-      {LexType::Newline,            "Newline"},
-      {LexType::Colon,              "Colon"},
-      {LexType::Dot,                "Dot"},
+      {TokenType::Symbol,             "Symbol"},
+      {TokenType::Keyword,            "Keyword"},
+      {TokenType::StringLiteral,      "StringLiteral"},
+      {TokenType::NumberLiteral,      "NumberLiteral"},
+      {TokenType::ArithmeticOperator, "ArithmeticOperator"},
+      {TokenType::Newline,            "Newline"},
+      {TokenType::Colon,              "Colon"},
+      {TokenType::Dot,                "Dot"},
     };
 
     return names[this->Type];
@@ -45,6 +44,7 @@ struct Lexeme
 
 class Lexer
 {
+
   public:
     Lexer(const char* file) : inputStream{file, std::ios::binary} 
     {
@@ -59,100 +59,33 @@ class Lexer
 
     Lexeme LexNext()
     {
-      char ch;
+      skipWhitespace();
+      skipComments();
 
-      //skip whitespace
-      while(true)
-      {
-        if(!HasMore())
-          throw std::runtime_error{"nomore"};
-
-        ch = inputStream.peek();
-
-        if(ch != ' ' && ch != '\t')
-          break;
-
-        inputStream.get();
-      }
-
-      //skip comments
-      if(ch == ';')
-      {
-        inputStream.get();
-
-        while(true)
-        {
-          if(!this->HasMore())
-            throw std::runtime_error{"nomore"};
-
-          ch = inputStream.peek();
-
-          if(ch == '\n')
-            break;
-
-          inputStream.get();
-        }
-      }
+      char ch = inputStream.peek();
 
       if(ch == '.')
-        return {LexType::Dot, inputStream.get()};
+        return {Lexeme::TokenType::Dot, inputStream.get()};
 
       if(ch == ':')
-        return {LexType::Colon, inputStream.get()};
+        return {Lexeme::TokenType::Colon, inputStream.get()};
 
       if(ch == '\n')
-        return {LexType::Newline, inputStream.get()};
+        return {Lexeme::TokenType::Newline, inputStream.get()};
 
       if(ch == '+' || ch == '-' || ch == '/' || ch == '*')
-        return {LexType::ArithmeticOperator, inputStream.get()};
+        return {Lexeme::TokenType::ArithmeticOperator, inputStream.get()};
 
       if(ch == '"')
-      {
-        inputStream.get();
-
-        std::string str;
-        while(true)
-        {
-          if(!this->HasMore())
-            throw std::runtime_error{"unable to lex string: no closing \" encountered before end of input."};
-
-          ch = inputStream.get();
-
-          if(ch == '"')
-            break;
-
-          str += ch;
-        }
-
-        return {LexType::String, str};
-      }
+        return lexStringLiteral();
 
       if(std::isdigit(ch))
-      {
-        std::string numStr;
-        numStr += inputStream.get();
+        return lexNumberLiteral();
 
-        while(this->HasMore())
-        {
-          ch = inputStream.peek();
+      if(std::isalnum(ch))
+        return lexString();
 
-          if(!std::isdigit(ch))
-            break;
-
-          numStr += inputStream.get();
-        }
-
-        return {LexType::Number, numStr};
-      }
-
-      //TODO: while alphanumerical
-      std::string str;
-      inputStream >> str;
-
-      if(isKeyword(str))
-        return {LexType::Keyword, str};
-
-      return {LexType::Symbol, str};
+      throw std::runtime_error{"Failed to lex unknown character encountered."};
     }
 
     std::vector<Lexeme> LexAll()
@@ -167,6 +100,71 @@ class Lexer
 
   private:
     std::ifstream inputStream;
+
+
+    void skipWhitespace()
+    {
+      while(std::isspace(inputStream.peek()))
+        inputStream.get();
+    }
+
+    void skipComments()
+    {
+      if(inputStream.peek() != ';')
+        return;
+
+      inputStream.get();
+
+      while(inputStream.peek() != '\n' && inputStream.peek() != EOF)
+        inputStream.get();
+    }
+
+    Lexeme lexStringLiteral()
+    {
+      if(inputStream.peek() != '"')
+        throw std::runtime_error{"failed to lex string literal: no opening \" encountered."};
+
+      inputStream.get();
+
+      std::string str;
+
+      while(inputStream.peek() != '"' && inputStream.peek() != EOF)
+        str += inputStream.get();
+
+      if(inputStream.get() != '"') 
+        throw std::runtime_error{"failed to lex string literal: no closing \" encountered."};
+
+      return {Lexeme::TokenType::StringLiteral, str};
+    }
+
+    Lexeme lexNumberLiteral()
+    {
+      if( !std::isdigit(inputStream.peek()) )
+        throw std::runtime_error{"failed to lex number literal: character encountered is not a digit."};
+
+      std::string numStr;
+
+      while(std::isdigit(inputStream.peek()))
+        numStr += inputStream.get();
+
+      return Lexeme{Lexeme::TokenType::NumberLiteral, numStr};
+    }
+
+    Lexeme lexString()
+    {
+      if( !std::isalnum(inputStream.peek()) )
+        throw std::runtime_error{"failed to lex string: character encountered is not alnum."};
+
+      std::string str;
+
+      while(std::isalnum(inputStream.peek()) || std::ispunct(inputStream.peek()))
+        str += inputStream.get();
+
+      if(isKeyword(str))
+        return Lexeme{Lexeme::TokenType::Keyword, str};
+
+      return Lexeme{Lexeme::TokenType::Symbol, str};
+    }
 
     bool isKeyword(std::string_view str)
     {
