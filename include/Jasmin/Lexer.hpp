@@ -12,11 +12,14 @@ struct Lexeme
     Symbol,
     Keyword,
     StringLiteral,
-    NumberLiteral,
+    NumericLiteral,
     ArithmeticOperator,
     Newline,
     Colon,
     Dot,
+    Bracket,
+    Brace,
+    Paren
   } Type;
 
   std::string Value;
@@ -31,11 +34,14 @@ struct Lexeme
       {TokenType::Symbol,             "Symbol"},
       {TokenType::Keyword,            "Keyword"},
       {TokenType::StringLiteral,      "StringLiteral"},
-      {TokenType::NumberLiteral,      "NumberLiteral"},
+      {TokenType::NumericLiteral,     "NumericLiteral"},
       {TokenType::ArithmeticOperator, "ArithmeticOperator"},
       {TokenType::Newline,            "Newline"},
       {TokenType::Colon,              "Colon"},
       {TokenType::Dot,                "Dot"},
+      {TokenType::Bracket,            "Bracket"},
+      {TokenType::Brace,              "Brace"},
+      {TokenType::Paren,              "Paren"},
     };
 
     return names[this->Type];
@@ -72,17 +78,26 @@ class Lexer
       if(ch == ':')
         return {Lexeme::TokenType::Colon, inputStream.get()};
 
-      if(ch == '\n')
+      if(ch == '\n' || ch == EOF)
         return {Lexeme::TokenType::Newline, inputStream.get()};
 
       if(ch == '+' || ch == '-' || ch == '/' || ch == '*')
         return {Lexeme::TokenType::ArithmeticOperator, inputStream.get()};
 
+      if(ch == '(' || ch == ')')
+        return {Lexeme::TokenType::Paren, inputStream.get()};
+
+      if(ch == '[' || ch == ']')
+        return {Lexeme::TokenType::Bracket, inputStream.get()};
+
+      if(ch == '{' || ch == '}')
+        return {Lexeme::TokenType::Brace, inputStream.get()};
+
       if(ch == '"')
         return lexStringLiteral();
 
       if(std::isdigit(ch))
-        return lexNumberLiteral();
+        return lexNumericLiteral();
 
       if(std::isalnum(ch))
         return lexString();
@@ -90,12 +105,12 @@ class Lexer
       throw std::runtime_error{"Failed to lex unknown character encountered."};
     }
 
-    std::vector<Lexeme> LexAll()
+    std::queue<Lexeme> LexAll()
     {
-      std::vector<Lexeme> lexemes;
+      std::queue<Lexeme> lexemes;
 
       while(this->HasMore())
-        lexemes.push_back(this->LexNext());
+        lexemes.emplace(this->LexNext());
 
       return lexemes;
     }
@@ -106,8 +121,11 @@ class Lexer
 
     void skipWhitespace()
     {
-      while(std::isspace(inputStream.peek()))
+      while(std::isspace(inputStream.peek())
+          && inputStream.peek() != '\n')
+      {
         inputStream.get();
+      }
     }
 
     void skipComments()
@@ -139,7 +157,7 @@ class Lexer
       return {Lexeme::TokenType::StringLiteral, str};
     }
 
-    Lexeme lexNumberLiteral()
+    Lexeme lexNumericLiteral()
     {
       if( !std::isdigit(inputStream.peek()) )
         throw std::runtime_error{"failed to lex number literal: character encountered is not a digit."};
@@ -149,7 +167,7 @@ class Lexer
       while(std::isdigit(inputStream.peek()))
         numStr += inputStream.get();
 
-      return Lexeme{Lexeme::TokenType::NumberLiteral, numStr};
+      return Lexeme{Lexeme::TokenType::NumericLiteral, numStr};
     }
 
     Lexeme lexString()
@@ -159,8 +177,12 @@ class Lexer
 
       std::string str;
 
-      while(std::isalnum(inputStream.peek()) || std::ispunct(inputStream.peek()))
+      while((std::isalnum(inputStream.peek())
+            || std::ispunct(inputStream.peek()))
+            && inputStream.peek() != ':')
+      {
         str += inputStream.get();
+      }
 
       if(isKeyword(str))
         return Lexeme{Lexeme::TokenType::Keyword, str};
