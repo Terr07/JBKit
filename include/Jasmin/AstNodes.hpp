@@ -21,7 +21,7 @@ struct Value: public Node
 };
 
 template <typename T>
-struct ImmediateValue final : public Value<T>
+struct ImmediateValue : public Value<T>
 {
   T Value;
 
@@ -29,11 +29,11 @@ struct ImmediateValue final : public Value<T>
 
   T GetValue() const override { return Value; }
 
-  std::string ToString() const 
-  { 
+  std::string ToString() const
+  {
     std::stringstream ss;
     ss << "ImmediateValue{";
-    ss << Value;
+    ss << this->Value;
     ss << '}';
     return ss.str();
   }
@@ -47,8 +47,15 @@ enum class ArithmeticOperation
   Mul
 };
 
+
+struct BinaryExpressionCommon
+{
+  static const std::unordered_map<std::string_view, ArithmeticOperation> CharOpMap;
+  static const std::unordered_map<ArithmeticOperation, std::string_view> OpCharMap;
+};
+
 template <typename LhsT, typename RhsT, typename CommonType = typename std::common_type<LhsT, RhsT>::type >
-struct BinaryExpression final: public Value<CommonType>
+struct BinaryExpression : public BinaryExpressionCommon, public Value<CommonType>
 {
   ArithmeticOperation Op;
   uPtr< Value<LhsT> > Lhs;
@@ -56,6 +63,9 @@ struct BinaryExpression final: public Value<CommonType>
 
   BinaryExpression(ArithmeticOperation op, Value<LhsT>* lhs, Value<RhsT>* rhs) 
     : Op{op}, Lhs{lhs}, Rhs{rhs} {}
+
+  BinaryExpression(std::string_view op, Value<LhsT>* lhs, Value<RhsT>* rhs) :
+    BinaryExpression( BinaryExpressionCommon::CharOpMap.at(op), lhs, rhs) {}
 
   CommonType GetValue() const override
   {
@@ -71,27 +81,48 @@ struct BinaryExpression final: public Value<CommonType>
     };
   }
 
-  virtual std::string ToString() const 
+  std::string ToString() const override
   { 
-    static std::unordered_map<ArithmeticOperation, std::string_view> ops
-    {
-      {ArithmeticOperation::Add, "+"},
-      {ArithmeticOperation::Sub, "-"},
-      {ArithmeticOperation::Div, "/"},
-      {ArithmeticOperation::Mul, "*"},
-    };
-
     std::stringstream ss;
     ss << "BinaryExpression{ ";
     ss << Lhs->ToString();
     ss << ' ';
-    ss << ops[this->Op];
+    ss << BinaryExpressionCommon::OpCharMap.at(this->Op);
     ss << ' ';
     ss << Rhs->ToString();
     ss << " }";
     return ss.str();
   }
 
+};
+
+struct Directive: public Node
+{
+  std::string Name;
+  std::vector<std::string> Parameters;
+
+  Directive(std::string name, std::vector<std::string> params);
+  std::string ToString() const override;
+};
+
+struct Instruction: public Node
+{
+  std::string Name;
+
+  using ArgT = std::variant<uPtr<Value<std::string>>, uPtr<Value<double>>>;
+  std::vector<ArgT> Args;
+
+  Instruction(std::string name);
+  std::string ToString() const override;
+};
+
+struct Label: public Node
+{
+  std::string Name;
+  std::vector< uPtr<Node> > Body;
+
+  Label(std::string name);
+  std::string ToString() const override;
 };
 
 
