@@ -4,8 +4,6 @@
 #include "Lexer.hpp"
 #include "AstNodes.hpp"
 
-//TODO: HIDE IN IMPLEMENTATION
-#include <fmt/core.h>
 
 namespace Jasmin
 {

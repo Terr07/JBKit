@@ -1,5 +1,7 @@
 #include "Jasmin/Parser.hpp"
 
+#include <fmt/core.h>
+
 using namespace Jasmin;
 
 

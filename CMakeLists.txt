@@ -22,7 +22,7 @@ add_library(Jasmin     "src/AstNodes.cpp"
 
 target_include_directories(Jasmin PUBLIC "include")
 
-target_link_libraries(Jasmin PUBLIC fmt)
+target_link_libraries(Jasmin PRIVATE fmt)
 
 add_executable(spike "spike/spike.cpp")
 target_link_libraries(spike PUBLIC Jasmin)
