@@ -3,7 +3,8 @@
 #include <memory>
 #include <stdexcept>
 #include <string_view>
-#include <vector>
+#include <queue>
+#include <variant>
 #include <fstream>
 #include <unordered_map>
 #include <exception>
