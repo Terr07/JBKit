@@ -60,15 +60,26 @@ class Lexer
     Lexeme lexStringLiteral();
     Lexeme lexNumericLiteral();
     Lexeme lexString();
-    bool isKeyword(std::string_view str);
+    bool isKeyword(std::string_view) const;
+
+    //allows passing to ensureNext. Apparently standard library functions such 
+    //as std::isdigit, aren't addressable so need wrappers like this to be passed
+    //as functors. 
+    static bool isDigit(char c) { return std::isdigit(c); }
+    static bool isAlnum(char c) { return std::isalnum(c); }
+    static bool isAlpha(char c) { return std::isalpha(c); }
+    static bool isSpace(char c) { return std::isspace(c); }
+    static bool isPunct(char c) { return std::ispunct(c); }
 
     Lexeme makeLex(Lexeme::TokenType type, std::string c) const;
     Lexeme makeLex(Lexeme::TokenType type, char c) const;
 
-    std::tuple<size_t, size_t> getMetaInfo() const;
-
     char get();
     char peek();
+    void ensureNext(char);
+    void ensureNext(std::function<bool(char)>);
+
+    std::runtime_error error(std::string) const;
 };
 
 } //namespace: Jasmin

@@ -1,5 +1,7 @@
 #include "Jasmin/Lexer.hpp"
 
+#include <fmt/core.h>
+
 using namespace Jasmin;
 
 Lexeme::Lexeme(TokenType type, std::string val)
@@ -37,7 +39,7 @@ Lexer::Lexer(const char* file)
 : inputStream{file, std::ios::binary} 
 {
   if(!inputStream.good())
-    throw std::runtime_error{"Failed to open file."};
+    throw std::runtime_error{"failed to open file."};
 }
 
 bool Lexer::HasMoreAfterSkip() 
@@ -78,13 +80,13 @@ Lexeme Lexer::LexNext()
   if(ch == '"')
     return lexStringLiteral();
 
-  if(std::isdigit(ch))
+  if(isDigit(ch))
     return lexNumericLiteral();
 
-  if(std::isalnum(ch))
+  if(isAlpha(ch))
     return lexString();
 
-  throw std::runtime_error{"Failed to lex unknown character encountered."};
+  throw error(fmt::format("encountered unknown lexeme value \"{}\"", ch));
 }
 
 std::queue<Lexeme> Lexer::LexAll()
@@ -99,7 +101,7 @@ std::queue<Lexeme> Lexer::LexAll()
 
 void Lexer::skipWhitespace()
 {
-  while(std::isspace(peek())
+  while(isSpace(peek())
       && peek() != '\n')
   {
     get();
@@ -119,9 +121,7 @@ void Lexer::skipComments()
 
 Lexeme Lexer::lexStringLiteral()
 {
-  if(peek() != '"')
-    throw std::runtime_error{"failed to lex string literal: no opening \" encountered."};
-
+  ensureNext('"');
   get();
 
   std::string str;
@@ -129,20 +129,19 @@ Lexeme Lexer::lexStringLiteral()
   while(peek() != '"' && peek() != EOF)
     str += get();
 
-  if(get() != '"') 
-    throw std::runtime_error{"failed to lex string literal: no closing \" encountered."};
+  ensureNext('"');
+  get();
 
   return makeLex(Lexeme::TokenType::StringLiteral, str);
 }
 
 Lexeme Lexer::lexNumericLiteral()
 {
-  if( !std::isdigit(peek()) )
-    throw std::runtime_error{"failed to lex number literal: character encountered is not a digit."};
+  ensureNext(isDigit);
 
   std::string numStr;
 
-  while(std::isdigit(peek()))
+  while(isDigit(peek()))
     numStr += get();
 
   return makeLex(Lexeme::TokenType::NumericLiteral, numStr);
@@ -150,13 +149,12 @@ Lexeme Lexer::lexNumericLiteral()
 
 Lexeme Lexer::lexString()
 {
-  if( !std::isalnum(peek()) )
-    throw std::runtime_error{"failed to lex string: character encountered is not alnum."};
+  ensureNext(isAlpha);
 
   std::string str;
 
-  while((std::isalnum(peek())
-        || std::ispunct(peek()))
+  while((isAlnum(peek())
+        || isPunct(peek()))
       && peek() != ':')
   {
     str += get();
@@ -168,7 +166,7 @@ Lexeme Lexer::lexString()
   return makeLex(Lexeme::TokenType::Symbol, str);
 }
 
-bool Lexer::isKeyword(std::string_view str)
+bool Lexer::isKeyword(std::string_view str) const
 {
   static std::unordered_set<std::string_view> keywords = 
   {
@@ -224,5 +222,22 @@ char Lexer::get()
 char Lexer::peek()
 {
   return inputStream.peek();
+}
+
+void Lexer::ensureNext(char next)
+{
+  if(peek() != next)
+    throw error(fmt::format("encountered '{}' when '{}' was expected", peek(), next));
+}
+
+void Lexer::ensureNext(std::function<bool(char)> isWhatsExpected)
+{
+  if(!isWhatsExpected(peek()))
+    throw error(fmt::format("encountered unexpected lexeme value '{}'", peek()));
+}
+
+std::runtime_error Lexer::error(std::string message) const
+{
+  return std::runtime_error{fmt::format("Lexer error: {} on line {}", message, lineNumber)};
 }
 
