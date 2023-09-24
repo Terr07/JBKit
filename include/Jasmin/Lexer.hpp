@@ -79,7 +79,7 @@ class Lexer
     void ensureNext(char);
     void ensureNext(std::function<bool(char)>);
 
-    std::runtime_error error(std::string) const;
+    std::runtime_error error(std::string_view) const;
 };
 
 } //namespace: Jasmin
