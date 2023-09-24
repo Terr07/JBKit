@@ -20,12 +20,10 @@ class Parser
     std::vector< uPtr<Node> > ParseAll();
 
   private:
-
     uPtr<Node> parseDirective();
     uPtr<Node> parseLabel(Lexeme labelName);
     uPtr<Node> parseInstruction(Lexeme instrName);
     Instruction::ArgT parseInstrArg();
-    uPtr<Value<double>> parseArithmeticExpr();
 
     Lexeme pop();
 

@@ -134,8 +134,16 @@ Instruction::ArgT Parser::parseInstrArg()
       return std::make_unique<ImmediateValue<std::string>>(std::move(pop().Value));
 
     case Lexeme::TokenType::NumericLiteral:
+      return std::make_unique<ImmediateValue<double>>(pop().GetNumericValue());
+
     case Lexeme::TokenType::ArithmeticOperator:
-      return parseArithmeticExpr();
+    {
+      if(nextLex.Value == "-")
+      {
+        pop();
+        return std::make_unique<ImmediateValue<double>>(-(pop().GetNumericValue()));
+      }
+    }
 
     default:
       {
@@ -144,34 +152,6 @@ Instruction::ArgT Parser::parseInstrArg()
       }
   }
 }
-
-uPtr<Value<double>> Parser::parseArithmeticExpr()
-{
-  Lexeme firstLex = pop();
-  Lexeme num = firstLex;
-  bool negate{false};
-
-  if(firstLex.Value == "-")
-  {
-    num = pop();
-    negate = true;
-  }
-
-  if(num.Type != Lexeme::TokenType::NumericLiteral)
-    throw std::runtime_error{ fmt::format("Failed to parse arithmetic expr, not a number encountered") };
-
-  auto lhs = std::make_unique<ImmediateValue<double>>(
-      negate ? -num.GetNumericValue() : num.GetNumericValue());
-
-  if(lexemes.front().Type != Lexeme::TokenType::ArithmeticOperator)
-    return lhs;
-
-  Lexeme op = pop();
-
-  //TODO: fix constr
-  return std::make_unique< BinaryExpression<double, double> >( op.Value, lhs.release(), parseArithmeticExpr().release());
-}
-
 
 Lexeme Parser::pop()
 {

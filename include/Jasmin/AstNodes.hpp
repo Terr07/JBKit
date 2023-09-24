@@ -39,63 +39,6 @@ struct ImmediateValue : public Value<T>
   }
 };
 
-enum class ArithmeticOperation
-{
-  Add,
-  Sub,
-  Div,
-  Mul
-};
-
-
-struct BinaryExpressionCommon
-{
-  static const std::unordered_map<std::string_view, ArithmeticOperation> CharOpMap;
-  static const std::unordered_map<ArithmeticOperation, std::string_view> OpCharMap;
-};
-
-template <typename LhsT, typename RhsT, typename CommonType = typename std::common_type<LhsT, RhsT>::type >
-struct BinaryExpression : public BinaryExpressionCommon, public Value<CommonType>
-{
-  ArithmeticOperation Op;
-  uPtr< Value<LhsT> > Lhs;
-  uPtr< Value<RhsT> > Rhs;
-
-  BinaryExpression(ArithmeticOperation op, Value<LhsT>* lhs, Value<RhsT>* rhs) 
-    : Op{op}, Lhs{lhs}, Rhs{rhs} {}
-
-  BinaryExpression(std::string_view op, Value<LhsT>* lhs, Value<RhsT>* rhs) :
-    BinaryExpression( BinaryExpressionCommon::CharOpMap.at(op), lhs, rhs) {}
-
-  CommonType GetValue() const override
-  {
-    switch(this->Op)
-    {
-      using OP = ArithmeticOperation;
-      case OP::Add: return this->Lhs->GetValue() + this->Rhs->GetValue();
-      case OP::Sub: return this->Lhs->GetValue() - this->Rhs->GetValue();
-      case OP::Div: return this->Lhs->GetValue() / this->Rhs->GetValue();
-      case OP::Mul: return this->Lhs->GetValue() * this->Rhs->GetValue();
-
-      default: throw std::runtime_error{"unhandled arithmetic operation type"};
-    };
-  }
-
-  std::string ToString() const override
-  { 
-    std::stringstream ss;
-    ss << "BinaryExpression{ ";
-    ss << Lhs->ToString();
-    ss << ' ';
-    ss << BinaryExpressionCommon::OpCharMap.at(this->Op);
-    ss << ' ';
-    ss << Rhs->ToString();
-    ss << " }";
-    return ss.str();
-  }
-
-};
-
 struct Directive: public Node
 {
   std::string Name;

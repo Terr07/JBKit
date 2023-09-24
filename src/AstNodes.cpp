@@ -2,24 +2,6 @@
 
 using namespace Jasmin::AstNodes;
 
-const std::unordered_map<std::string_view, ArithmeticOperation> 
-BinaryExpressionCommon::CharOpMap
-{
-  {"+", ArithmeticOperation::Add},
-  {"-", ArithmeticOperation::Sub},
-  {"/", ArithmeticOperation::Div},
-  {"*", ArithmeticOperation::Mul},
-};
-
-const std::unordered_map<ArithmeticOperation, std::string_view> 
-BinaryExpressionCommon::OpCharMap
-{
-  {ArithmeticOperation::Add, "+"},
-  {ArithmeticOperation::Sub, "-"},
-  {ArithmeticOperation::Div, "/"},
-  {ArithmeticOperation::Mul, "*"},
-};
-
 Directive::Directive(std::string name, std::vector<std::string> params)
   : Name{name}, Parameters{params}  
 {
