@@ -5,9 +5,8 @@ using namespace Jasmin;
 Lexeme::Lexeme(TokenType type, std::string val)
 : Type{type}, Value{val} {}
 
-Lexeme::Lexeme(TokenType type, int val)
-: Type{type}, Value{static_cast<char>(val)} {}
-
+Lexeme::Lexeme(TokenType type, char val)
+: Type{type}, Value{val} {}
 
 std::string_view Lexeme::GetTypeString() const
 {
@@ -45,7 +44,7 @@ bool Lexer::HasMoreAfterSkip()
 {
   skipWhitespace();
   skipComments();
-  return inputStream.peek() != EOF;
+  return peek() != EOF;
 }
 
 Lexeme Lexer::LexNext()
@@ -53,28 +52,28 @@ Lexeme Lexer::LexNext()
   skipWhitespace();
   skipComments();
 
-  char ch = inputStream.peek();
+  char ch = peek();
 
   if(ch == '.')
-    return {Lexeme::TokenType::Dot, inputStream.get()};
+    return makeLex(Lexeme::TokenType::Dot, get());
 
   if(ch == ':')
-    return {Lexeme::TokenType::Colon, inputStream.get()};
+    return makeLex(Lexeme::TokenType::Colon, get());
 
   if(ch == '\n' || ch == EOF)
-    return {Lexeme::TokenType::Newline, inputStream.get()};
+    return makeLex(Lexeme::TokenType::Newline, get());
 
   if(ch == '+' || ch == '-' || ch == '/' || ch == '*')
-    return {Lexeme::TokenType::ArithmeticOperator, inputStream.get()};
+    return makeLex(Lexeme::TokenType::ArithmeticOperator, get());
 
   if(ch == '(' || ch == ')')
-    return {Lexeme::TokenType::Paren, inputStream.get()};
+    return makeLex(Lexeme::TokenType::Paren, get());
 
   if(ch == '[' || ch == ']')
-    return {Lexeme::TokenType::Bracket, inputStream.get()};
+    return makeLex(Lexeme::TokenType::Bracket, get());
 
   if(ch == '{' || ch == '}')
-    return {Lexeme::TokenType::Brace, inputStream.get()};
+    return makeLex(Lexeme::TokenType::Brace, get());
 
   if(ch == '"')
     return lexStringLiteral();
@@ -100,73 +99,73 @@ std::queue<Lexeme> Lexer::LexAll()
 
 void Lexer::skipWhitespace()
 {
-  while(std::isspace(inputStream.peek())
-      && inputStream.peek() != '\n')
+  while(std::isspace(peek())
+      && peek() != '\n')
   {
-    inputStream.get();
+    get();
   }
 }
 
 void Lexer::skipComments()
 {
-  if(inputStream.peek() != ';')
+  if(peek() != ';')
     return;
 
-  inputStream.get();
+  get();
 
-  while(inputStream.peek() != '\n' && inputStream.peek() != EOF)
-    inputStream.get();
+  while(peek() != '\n' && peek() != EOF)
+    get();
 }
 
 Lexeme Lexer::lexStringLiteral()
 {
-  if(inputStream.peek() != '"')
+  if(peek() != '"')
     throw std::runtime_error{"failed to lex string literal: no opening \" encountered."};
 
-  inputStream.get();
+  get();
 
   std::string str;
 
-  while(inputStream.peek() != '"' && inputStream.peek() != EOF)
-    str += inputStream.get();
+  while(peek() != '"' && peek() != EOF)
+    str += get();
 
-  if(inputStream.get() != '"') 
+  if(get() != '"') 
     throw std::runtime_error{"failed to lex string literal: no closing \" encountered."};
 
-  return {Lexeme::TokenType::StringLiteral, str};
+  return makeLex(Lexeme::TokenType::StringLiteral, str);
 }
 
 Lexeme Lexer::lexNumericLiteral()
 {
-  if( !std::isdigit(inputStream.peek()) )
+  if( !std::isdigit(peek()) )
     throw std::runtime_error{"failed to lex number literal: character encountered is not a digit."};
 
   std::string numStr;
 
-  while(std::isdigit(inputStream.peek()))
-    numStr += inputStream.get();
+  while(std::isdigit(peek()))
+    numStr += get();
 
-  return Lexeme{Lexeme::TokenType::NumericLiteral, numStr};
+  return makeLex(Lexeme::TokenType::NumericLiteral, numStr);
 }
 
 Lexeme Lexer::lexString()
 {
-  if( !std::isalnum(inputStream.peek()) )
+  if( !std::isalnum(peek()) )
     throw std::runtime_error{"failed to lex string: character encountered is not alnum."};
 
   std::string str;
 
-  while((std::isalnum(inputStream.peek())
-        || std::ispunct(inputStream.peek()))
-      && inputStream.peek() != ':')
+  while((std::isalnum(peek())
+        || std::ispunct(peek()))
+      && peek() != ':')
   {
-    str += inputStream.get();
+    str += get();
   }
 
   if(isKeyword(str))
-    return Lexeme{Lexeme::TokenType::Keyword, str};
+    return makeLex(Lexeme::TokenType::Keyword, str);
 
-  return Lexeme{Lexeme::TokenType::Symbol, str};
+  return makeLex(Lexeme::TokenType::Symbol, str);
 }
 
 bool Lexer::isKeyword(std::string_view str)
@@ -189,3 +188,41 @@ bool Lexer::isKeyword(std::string_view str)
 
   return keywords.find(str) != keywords.end();
 }
+
+Lexeme Lexer::makeLex(Lexeme::TokenType type, std::string c) const
+{
+  auto lexeme = Lexeme{type, c};
+
+  lexeme.Info.LineNumber = lineNumber;
+  lexeme.Info.LineOffset = lineOffset - c.length();
+  lexeme.Info.FileOffset = fileOffset - c.length();
+
+  return lexeme;
+}
+
+Lexeme Lexer::makeLex(Lexeme::TokenType type, char c) const
+{
+  return makeLex(type, std::string{c});
+}
+
+
+char Lexer::get()
+{
+  char ch = inputStream.get();
+  ++lineOffset;
+  ++fileOffset;
+
+  if(ch == '\n')
+  {
+    ++lineNumber;
+    lineOffset = 1;
+  }
+
+  return ch;
+}
+
+char Lexer::peek()
+{
+  return inputStream.peek();
+}
+
