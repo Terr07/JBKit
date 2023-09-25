@@ -16,9 +16,9 @@ bool Parser::HasMoreAfterSkip()
   //Newlines are part of some expression syntaxes but the top level parser
   //ignores them, so HasMoreAfterSkip() shouldn't return true if there are only
   //newlines left in the queue
-  while(lexemes.front().Type == Lexeme::TokenType::Newline)
+  while(peek().Type == Lexeme::TokenType::Newline)
   {
-    lexemes.pop();
+    pop();
 
     if(lexemes.empty())
       return false;
@@ -30,10 +30,10 @@ bool Parser::HasMoreAfterSkip()
 uPtr<Node> Parser::ParseNext()
 {
   //skip newlines
-  while(lexemes.front().Type == Lexeme::TokenType::Newline)
+  while(peek().Type == Lexeme::TokenType::Newline)
     pop();
 
-  if(lexemes.front().Type == Lexeme::TokenType::Dot)
+  if(peek().Type == Lexeme::TokenType::Directive)
     return parseDirective();
 
   Lexeme firstToken = pop();
@@ -41,14 +41,14 @@ uPtr<Node> Parser::ParseNext()
   if(lexemes.empty())
     return parseInstruction(firstToken);
 
-  Lexeme secondToken = lexemes.front();
+  Lexeme secondToken = peek();
 
   if(secondToken.Type == Lexeme::TokenType::Colon)
     return parseLabel(firstToken);
   else
     return parseInstruction(firstToken);
 
-  throw std::runtime_error{"Unknown top level expression encountered."};
+  throw error("Unknown top level expression encountered."); 
 }
 
 std::vector< uPtr<Node> > Parser::ParseAll()
@@ -63,50 +63,32 @@ std::vector< uPtr<Node> > Parser::ParseAll()
 
 uPtr<Node> Parser::parseDirective() 
 { 
-  Lexeme nextLex = pop();
-
-  if(nextLex.Type != Lexeme::TokenType::Dot)
-  {
-    throw std::runtime_error{ fmt::format(
-        "parseDirective expected dot as first lexeme but got '{}'", nextLex.Value
-        )};
-  }
-
-  Lexeme name = pop();
+  ensureNext(Lexeme::TokenType::Directive, "DirectiveParser");
+  Lexeme directive = pop();
 
   std::vector<std::string> params;
 
-  while(lexemes.front().Type != Lexeme::TokenType::Newline)
+  while(peek().Type != Lexeme::TokenType::Newline)
   {
     Lexeme param = pop();
     params.push_back(param.Value);
   }
 
-  //pop final newline or EOF
-  pop();
-
-  return std::make_unique<Directive>(name.Value, std::move(params));
+  return std::make_unique<Directive>(directive.Value, std::move(params));
 }
 
 uPtr<Node> Parser::parseLabel(Lexeme labelName) 
 {
-  Lexeme colon = pop();
+  ensureNext(Lexeme::TokenType::Colon, "LabelParser");
+  pop();
 
-  if(colon.Type != Lexeme::TokenType::Colon)
-    throw std::runtime_error{"parseLabel called but second lexeme wasn't a colon \":\""};
-
-  Lexeme newline = pop();
-
-  if(newline.Type != Lexeme::TokenType::Newline)
-    throw std::runtime_error{"parseLabel called but third lexeme wasn't a newline\":\""};
+  ensureNext(Lexeme::TokenType::Newline, "LabelParser");
+  pop();
 
   uPtr<Label> pNode = std::make_unique<Label>(labelName.Value);
 
-  while(lexemes.front().Type != Lexeme::TokenType::Newline)
+  while(!lexemes.empty() && peek().Type != Lexeme::TokenType::Newline)
     pNode->Body.emplace_back(this->ParseNext());
-
-  //pop final newline or EOF
-  pop();
 
   return pNode;
 }
@@ -115,21 +97,19 @@ uPtr<Node> Parser::parseInstruction(Lexeme instrName)
 {
   auto pNode = std::make_unique<Instruction>(instrName.Value);
 
-  while(lexemes.front().Type != Lexeme::TokenType::Newline)
+  while(peek().Type != Lexeme::TokenType::Newline)
     pNode->Args.emplace_back(parseInstrArg());
-
-  pop(); //pop newline or EOF after args
 
   return pNode;
 }
 
 Instruction::ArgT Parser::parseInstrArg()
 {
-  Lexeme nextLex = lexemes.front();
+  Lexeme nextLex = peek();
 
   switch(nextLex.Type)
   {
-    case Lexeme::TokenType::Symbol:
+    case Lexeme::TokenType::String:
     case Lexeme::TokenType::StringLiteral:
       return std::make_unique<ImmediateValue<std::string>>(std::move(pop().Value));
 
@@ -146,10 +126,10 @@ Instruction::ArgT Parser::parseInstrArg()
     }
 
     default:
-      {
-        throw std::runtime_error{ fmt::format(
-            "Failed to parse instruction argument, encountered {}.", nextLex.GetTypeString())};
-      }
+    {
+      throw error( fmt::format("failed to parse instruction argument \"{}\".", 
+            nextLex.GetTypeString()));
+    }
   }
 }
 
@@ -158,9 +138,34 @@ Lexeme Parser::pop()
   if(lexemes.empty())
     throw std::runtime_error{"Ran out of lexemes."};
 
-  Lexeme lexeme{lexemes.front()};
+  Lexeme lexeme{peek()};
   lexemes.pop();
 
 
   return lexeme;
 }
+
+const Lexeme& Parser::peek() const
+{
+  if(lexemes.empty())
+    throw std::runtime_error{"parser attempted to peek into empty queue."};
+
+  return lexemes.front();
+}
+
+void Parser::ensureNext(Lexeme::TokenType expected, std::string_view parserName)
+{
+  if(peek().Type != expected)
+  {
+    throw error(fmt::format("{} encountered '{}' when '{}' was expected", 
+          parserName, peek().GetTypeString(), Lexeme::GetTypeString(expected)));
+  }
+}
+
+std::runtime_error Parser::error(std::string_view message) const
+{
+  return std::runtime_error{
+    fmt::format("Parser error: {} on line {} col {}", 
+        message, peek().Info.LineNumber, peek().Info.LineOffset)};
+}
+

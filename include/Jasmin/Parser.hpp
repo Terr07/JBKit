@@ -20,15 +20,19 @@ class Parser
     std::vector< uPtr<Node> > ParseAll();
 
   private:
+    std::queue<Lexeme> lexemes;
+
     uPtr<Node> parseDirective();
     uPtr<Node> parseLabel(Lexeme labelName);
     uPtr<Node> parseInstruction(Lexeme instrName);
     Instruction::ArgT parseInstrArg();
 
     Lexeme pop();
+    const Lexeme& peek() const;
 
-  private:
-    std::queue<Lexeme> lexemes;
+    void ensureNext(Lexeme::TokenType, std::string_view);
+
+    std::runtime_error error(std::string_view) const;
 };
 
 
