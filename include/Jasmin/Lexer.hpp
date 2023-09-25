@@ -16,8 +16,9 @@ struct Lexeme
 
   enum class TokenType
   {
-    Symbol,
+    String,
     Keyword,
+    Directive,
     StringLiteral,
     NumericLiteral,
     ArithmeticOperator,
@@ -36,6 +37,7 @@ struct Lexeme
   Lexeme(TokenType type, char val);
 
   std::string_view GetTypeString() const;
+  static std::string_view GetTypeString(TokenType);
 };
 
 class Lexer
@@ -60,7 +62,8 @@ class Lexer
     Lexeme lexStringLiteral();
     Lexeme lexNumericLiteral();
     Lexeme lexString();
-    bool isKeyword(std::string_view) const;
+    static bool isKeyword(std::string_view);
+    static bool isDirectiveName(std::string_view);
 
     //allows passing to ensureNext. Apparently standard library functions such 
     //as std::isdigit, aren't addressable so need wrappers like this to be passed

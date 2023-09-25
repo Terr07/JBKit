@@ -12,10 +12,16 @@ Lexeme::Lexeme(TokenType type, char val)
 
 std::string_view Lexeme::GetTypeString() const
 {
-  static std::unordered_map<TokenType, std::string_view> names =
+  return GetTypeString(this->Type);
+}
+
+std::string_view Lexeme::GetTypeString(TokenType type)
+{
+  std::unordered_map<TokenType, std::string_view> names =
   {
-    {TokenType::Symbol,             "Symbol"},
+    {TokenType::String,             "String"},
     {TokenType::Keyword,            "Keyword"},
+    {TokenType::Directive,          "Directive"},
     {TokenType::StringLiteral,      "StringLiteral"},
     {TokenType::NumericLiteral,     "NumericLiteral"},
     {TokenType::ArithmeticOperator, "ArithmeticOperator"},
@@ -27,7 +33,7 @@ std::string_view Lexeme::GetTypeString() const
     {TokenType::Paren,              "Paren"},
   };
 
-  return names[this->Type];
+  return names[type];
 }
 
 double Lexeme::GetNumericValue() const
@@ -57,7 +63,19 @@ Lexeme Lexer::LexNext()
   char ch = peek();
 
   if(ch == '.')
-    return makeLex(Lexeme::TokenType::Dot, get());
+  {
+    ch = get();
+    Lexeme nextLexeme = LexNext();
+
+    if(nextLexeme.Type != Lexeme::TokenType::String)
+      return makeLex(Lexeme::TokenType::Dot, ch);
+
+    if(isDirectiveName(nextLexeme.Value))
+      return makeLex(Lexeme::TokenType::Directive, nextLexeme.Value);
+
+    throw error( 
+        fmt::format("expected directive name after '.' but got \"{}\"", nextLexeme.Value));
+  }
 
   if(ch == ':')
     return makeLex(Lexeme::TokenType::Colon, get());
@@ -84,7 +102,14 @@ Lexeme Lexer::LexNext()
     return lexNumericLiteral();
 
   if(isAlpha(ch))
-    return lexString();
+  {
+    Lexeme strLex = lexString();
+
+    if(isKeyword(strLex.Value))
+      return makeLex(Lexeme::TokenType::Keyword, strLex.Value);
+    else
+      return strLex;
+  }
 
   throw error(fmt::format("encountered unknown lexeme value \"{}\"", ch));
 }
@@ -160,15 +185,12 @@ Lexeme Lexer::lexString()
     str += get();
   }
 
-  if(isKeyword(str))
-    return makeLex(Lexeme::TokenType::Keyword, str);
-
-  return makeLex(Lexeme::TokenType::Symbol, str);
+  return makeLex(Lexeme::TokenType::String, str);
 }
 
-bool Lexer::isKeyword(std::string_view str) const
+bool Lexer::isKeyword(std::string_view str) 
 {
-  static std::unordered_set<std::string_view> keywords = 
+  std::unordered_set<std::string_view> keywords = 
   {
     "public",
     "private",
@@ -177,14 +199,34 @@ bool Lexer::isKeyword(std::string_view str) const
     "volatile",
     "transient",
     "final",
-    "super",
-    "interface",
     "abstract",
     "native",
     "synchronized",
   };
 
   return keywords.find(str) != keywords.end();
+}
+
+bool Lexer::isDirectiveName(std::string_view str) 
+{
+  std::unordered_set<std::string_view> directiveNames = 
+  {
+    "catch",
+    "class",
+    "end",
+    "field",
+    "implements",
+    "interface",
+    "limit",
+    "line",
+    "method",
+    "source",
+    "super",
+    "throws",
+    "var",
+  };
+
+  return directiveNames.find(str) != directiveNames.end();
 }
 
 Lexeme Lexer::makeLex(Lexeme::TokenType type, std::string c) const
@@ -236,8 +278,9 @@ void Lexer::ensureNext(std::function<bool(char)> isWhatsExpected)
     throw error(fmt::format("encountered unexpected lexeme value '{}'", peek()));
 }
 
-std::runtime_error Lexer::error(std::string message) const
+std::runtime_error Lexer::error(std::string_view message) const
 {
-  return std::runtime_error{fmt::format("Lexer error: {} on line {}", message, lineNumber)};
+  return std::runtime_error{fmt::format("Lexer error: {} on line {} col {}", 
+      message, lineNumber, lineOffset)};
 }
 
