@@ -218,24 +218,19 @@ static ErrorOr<void> writeAttr(std::ostream& stream, const SourceFileAttribute& 
 
 static ErrorOr<void> writeAttr(std::ostream& stream, const CodeAttribute& attr)
 {
-  /*
   TRY( Write<BigEndian>(stream, attr.MaxStack,
                                 attr.MaxLocals) );
 
-  U32 codeLen{0};
 
   //TODO: handle padding for instructions that require alignment
-  for(const auto&  pInstr: attr.Code)
-    codeLen += pInstr->GetLength();
+  U32 codeLen{0};
+  for(const Instruction&  instr : attr.Code)
+    codeLen += instr.GetLength();
 
   TRY( Write<BigEndian>(stream, codeLen) );
 
-  //TODO: handle padding for instructions that require alignment
-  for(const auto& pInstr : attr.Code)
-    TRY( Serializer::SerializeInstruction(stream, *pInstr.get()) );
-
-  if(stream.bad())
-    return Error::FromFormatStr("failed to write code attr, stream badbit set: %s in %s", __func__, __FILE__);
+  for(const Instruction& instr : attr.Code)
+    TRY( Serializer::SerializeInstruction(stream, instr) );
 
   TRY( Write<BigEndian>(stream, static_cast<U16>(attr.ExceptionTable.size())) );
 
@@ -253,9 +248,6 @@ static ErrorOr<void> writeAttr(std::ostream& stream, const CodeAttribute& attr)
     TRY ( Serializer::SerializeAttribute(stream, *pAttr) );
 
   return {};
-  */
-
-  return Error::FromLiteralStr("writeAttr for CodeAttribute not imlemented.");
 }
 
 static ErrorOr<void> writeAttr(std::ostream& stream, const ConstantValueAttribute& attr)
@@ -288,65 +280,27 @@ ErrorOr<void> Serializer::SerializeAttribute(std::ostream& stream, const Attribu
   return Error::FromFormatStr("WriteAttribute: write func not implemented for attribute with name \"%.*s\"", info.GetName().length(), info.GetName().data());
 }
 
-template <typename T>
-static ErrorOr<void> writeOperand(std::ostream& stream, const Instruction& instr, size_t i)
-{
-  auto errOrOperandValue = instr.GetOperand(i);
-  VERIFY(errOrOperandValue);
-
-  T value = static_cast<T>(errOrOperandValue.Get());
-
-  TRY(Write<BigEndian>(stream, value));
-  return {};
-}
-
-static ErrorOr<void> writeOperands(std::ostream& stream, const Instruction& instr)
-{
-  //TODO: handle padding etc etc
-
-  for(size_t i = 0; i < instr.GetNOperands(); i++)
-  {
-    auto errOrType = instr.GetOperandType(i);
-    VERIFY(errOrType);
-
-    switch(errOrType.Get())
-    {
-      case Instruction::OperandType::U8:  TRY(writeOperand<U8>( stream, instr, i));break;
-      case Instruction::OperandType::U16: TRY(writeOperand<U16>(stream, instr, i));break;
-      case Instruction::OperandType::S8:  TRY(writeOperand<S8>( stream, instr, i));break;
-      case Instruction::OperandType::S16: TRY(writeOperand<S16>(stream, instr, i));break;
-      case Instruction::OperandType::S32: TRY(writeOperand<S32>(stream, instr, i));break;
-      default: return Error::FromLiteralStr("SerializeInstruction encountered unknown operand type.");
-    }
-
-  }
-
-  return {};
-}
-
 ErrorOr<void> Serializer::SerializeInstruction(std::ostream& stream, const Instruction& instr)
 {
-  TRY(Write<BigEndian>(stream, instr.GetOpCode()));
-  TRY(writeOperands(stream, instr));
-  return {};
+  if(instr.IsComplex())
+    return Error::FromLiteralStr("SerializeInstruction not implemented for complex instructions");
 
-  /*
+  TRY(Write<BigEndian>(stream, instr.Op));
 
-  for(size_t i = 0; i < instr.GetNOperands(); ++i)
+  for(size_t i{0}; i < instr.GetNOperands(); ++i)
   {
-    auto errOrOpr = instr.GetOperand(i);
-    VERIFY(errOrOpr);
-
-    auto operandSerializer = [&](auto& operand)
+    switch( instr.GetOperandType(i) )
     {
-      return Write<BigEndian>(stream, operand);
-    };
-
-    TRY(std::visit(operandSerializer, errOrOpr.Get()));
+      using type = Instruction::OperandType;
+      case type::TypeS32: TRY(Write<BigEndian>(stream, instr.Operand<S32>(i))) break;
+      case type::TypeS16: TRY(Write<BigEndian>(stream, instr.Operand<S16>(i))) break;
+      case type::TypeS8 : TRY(Write<BigEndian>(stream, instr.Operand<S8 >(i))) break;
+      case type::TypeU16: TRY(Write<BigEndian>(stream, instr.Operand<U16>(i))) break;
+      case type::TypeU8 : TRY(Write<BigEndian>(stream, instr.Operand<U8 >(i))) break;
+    }
   }
 
   return {};
-  */
 }
 
 } //namespace ClassFile

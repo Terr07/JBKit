@@ -298,7 +298,7 @@ static ErrorOr<void> readAttribute(std::istream& stream,
     auto errOrInstr = Parser::ParseInstruction(stream);
     VERIFY(errOrInstr);
 
-    attr.Code.emplace_back( std::move(errOrInstr.Release()) );
+    attr.Code.emplace_back(errOrInstr.Release());
 
     auto parsed = stream.tellg() - streampos_before;
     assert(parsed > 0);
@@ -413,49 +413,30 @@ ErrorOr< std::unique_ptr<AttributeInfo> > Parser::ParseAttribute(
   return std::unique_ptr<AttributeInfo>(attr);
 }
 
-template <typename T>
-static ErrorOr<void> readOperand(std::istream& stream, Instruction& instr, size_t i)
+ErrorOr<Instruction> Parser::ParseInstruction(std::istream& stream)
 {
-  T value;
-  TRY(Read<BigEndian>(stream, value));
-  TRY(instr.SetOperand(i, value));
-  return {};
-}
+  Instruction::Opcode op;
+  TRY(Read<BigEndian>(stream, (U8&)op));
 
-static ErrorOr<void> readOperands(std::istream& stream, Instruction& instr)
-{
-  for(size_t i = 0; i < instr.GetNOperands(); ++i)
+  Instruction instr = Instruction::MakeInstruction(op).Get();
+
+  if(instr.IsComplex())
+    return Error::FromLiteralStr("complex instruction parsing not implemented");
+
+  for(size_t i{0}; i < instr.GetNOperands(); i++)
   {
-    auto errOrOperandType = instr.GetOperandType(i);
-    VERIFY(errOrOperandType);
-
-    switch(errOrOperandType.Get())
+    switch( instr.GetOperandType(i) )
     {
-      case Instruction::OperandType::U8:  TRY(readOperand<U8>( stream, instr, i));break;
-      case Instruction::OperandType::U16: TRY(readOperand<U16>(stream, instr, i));break;
-      case Instruction::OperandType::S8:  TRY(readOperand<S8>( stream, instr, i));break;
-      case Instruction::OperandType::S16: TRY(readOperand<S16>(stream, instr, i));break;
-      case Instruction::OperandType::S32: TRY(readOperand<S32>(stream, instr, i));break;
-      default: return Error::FromLiteralStr("ParsesInstruction encountered unknown operand type.");
+      using Type = Instruction::OperandType;
+      case Type::TypeS32: Read<BigEndian>(stream, instr.Operand<S32>(i)); break;
+      case Type::TypeS16: Read<BigEndian>(stream, instr.Operand<S16>(i)); break;
+      case Type::TypeS8 : Read<BigEndian>(stream, instr.Operand<S8 >(i)); break;
+      case Type::TypeU16: Read<BigEndian>(stream, instr.Operand<U16>(i)); break;
+      case Type::TypeU8 : Read<BigEndian>(stream, instr.Operand<U8 >(i)); break;
     }
   }
 
-  return {};
-}
-
-ErrorOr< std::unique_ptr<Instruction>> Parser::ParseInstruction(std::istream& stream)
-{
-  OPCODE op;
-  TRY(Read<BigEndian>(stream, (U8&)op));
-
-  auto errOrInstr = Instruction::NewInstruction(op);
-  VERIFY(errOrInstr);
-
-  auto pInstr = Instruction::NewInstruction(op).Release();
-
-  TRY(readOperands(stream, *pInstr));
-
-  return pInstr;
+  return instr;
 }
 
 } //namespace ClassFile

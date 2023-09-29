@@ -1,3 +1,7 @@
+/*
+ * Parses & prints informations about classfile.
+ */
+
 #include <iostream>
 #include <fstream>
 #include <cassert>
@@ -122,11 +126,11 @@ std::string_view GetOperandTypeName(ClassFile::Instruction::OperandType type)
   switch(type)
   {
     using Type = ClassFile::Instruction::OperandType;
-    case Type::U8:  return "U8";
-    case Type::U16: return "U16";
-    case Type::S8:  return "S8";
-    case Type::S16: return "S16";
-    case Type::S32: return "S32";
+    case Type::TypeU8:  return "U8";
+    case Type::TypeU16: return "U16";
+    case Type::TypeS8:  return "S8";
+    case Type::TypeS16: return "S16";
+    case Type::TypeS32: return "S32";
   }
 
   return "UNKNOWN_TYPE";
@@ -135,7 +139,7 @@ std::string_view GetOperandTypeName(ClassFile::Instruction::OperandType type)
 void PrintInstrInfo(const ClassFile::Instruction& instr)
 {
   std::cout << instr.GetMnemonic() << " (0x";
-  std::cout << std::hex << (int)instr.GetOpCode() << std::dec << ")";
+  std::cout << std::hex << (int)instr.Op << std::dec << ")";
 
   if(instr.GetNOperands() > 0)
     std::cout << ": Opreands[";
@@ -144,9 +148,9 @@ void PrintInstrInfo(const ClassFile::Instruction& instr)
 
   for(size_t i = 0; i < instr.GetNOperands(); i++)
   {
-    std::cout << GetOperandTypeName(instr.GetOperandType(i).Get());
+    std::cout << GetOperandTypeName(instr.GetOperandType(i));
     std::cout << "{";
-    std::cout <<  instr.GetOperand(i).Get();
+    std::cout <<  instr.GetOperand(i);
     std::cout << "}";
 
     if(i + 1 != instr.GetNOperands())
@@ -250,7 +254,7 @@ void PrintMethods(const ClassFile::ClassFile& cf)
           std::cout << ":\n";
 
         std::cout << "    ";
-        PrintInstrInfo(*codeAttr.Code[j]);
+        PrintInstrInfo(codeAttr.Code[j]);
       }
 
     }

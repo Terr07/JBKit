@@ -76,7 +76,7 @@ struct CodeAttribute : public AttributeInfo
 
   U16 MaxStack;
   U16 MaxLocals;
-  std::vector< std::unique_ptr<Instruction> > Code;
+  std::vector<Instruction> Code;
 
   struct ExceptionHandler
   {
@@ -97,8 +97,8 @@ struct CodeAttribute : public AttributeInfo
 
     len += sizeof(U32); //serialized field: "code_length" 
 
-    for(const auto& pInstr : Code)
-      len += pInstr->GetLength();
+    for(const Instruction& instr : Code)
+      len += instr.GetLength();
 
     len += sizeof(U16); //serialized field: "exception_table_length" 
     len += ExceptionTable.size() * sizeof(U16) * 4;

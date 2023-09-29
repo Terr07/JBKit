@@ -16,7 +16,7 @@ class Parser
     static ErrorOr<FieldMethodInfo> ParseFieldMethodInfo(std::istream&, const ConstantPool&);
     static ErrorOr< std::unique_ptr<AttributeInfo> > ParseAttribute(std::istream&, const ConstantPool&);
 
-    static ErrorOr< std::unique_ptr<Instruction> > ParseInstruction(std::istream&);
+    static ErrorOr<Instruction> ParseInstruction(std::istream&);
 };
 
 
