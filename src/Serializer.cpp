@@ -280,6 +280,17 @@ ErrorOr<void> Serializer::SerializeAttribute(std::ostream& stream, const Attribu
   return Error::FromFormatStr("WriteAttribute: write func not implemented for attribute with name \"%.*s\"", info.GetName().length(), info.GetName().data());
 }
 
+template <typename T>
+static ErrorOr<void> writeOperand(std::ostream& stream, const Instruction& instr, size_t i)
+{
+  auto errOrRef = instr.Operand<T>(i);
+  VERIFY(errOrRef);
+
+  TRY(Write<BigEndian>(stream, errOrRef.Get().get()));
+
+  return NoError{};
+}
+
 ErrorOr<void> Serializer::SerializeInstruction(std::ostream& stream, const Instruction& instr)
 {
   if(instr.IsComplex())

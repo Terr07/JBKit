@@ -413,6 +413,17 @@ ErrorOr< std::unique_ptr<AttributeInfo> > Parser::ParseAttribute(
   return std::unique_ptr<AttributeInfo>(attr);
 }
 
+template <typename T>
+static ErrorOr<void> readOperand(std::istream& stream, Instruction& instr, size_t i)
+{
+  auto errOrRef = instr.Operand<T>(i);
+  VERIFY(errOrRef);
+
+  TRY(Read<BigEndian>(stream, errOrRef.Get().get()));
+
+  return NoError{};
+}
+
 ErrorOr<Instruction> Parser::ParseInstruction(std::istream& stream)
 {
   Instruction::Opcode op;
@@ -428,11 +439,11 @@ ErrorOr<Instruction> Parser::ParseInstruction(std::istream& stream)
     switch( instr.GetOperandType(i) )
     {
       using Type = Instruction::OperandType;
-      case Type::TypeS32: Read<BigEndian>(stream, instr.Operand<S32>(i)); break;
-      case Type::TypeS16: Read<BigEndian>(stream, instr.Operand<S16>(i)); break;
-      case Type::TypeS8 : Read<BigEndian>(stream, instr.Operand<S8 >(i)); break;
-      case Type::TypeU16: Read<BigEndian>(stream, instr.Operand<U16>(i)); break;
-      case Type::TypeU8 : Read<BigEndian>(stream, instr.Operand<U8 >(i)); break;
+      case Type::TypeS32: TRY(readOperand<S32>(stream, instr, i)) break;
+      case Type::TypeS16: TRY(readOperand<S16>(stream, instr, i)) break;
+      case Type::TypeS8 : TRY(readOperand<S8 >(stream, instr, i)) break;
+      case Type::TypeU16: TRY(readOperand<U16>(stream, instr, i)) break;
+      case Type::TypeU8 : TRY(readOperand<U8 >(stream, instr, i)) break;
     }
   }
 

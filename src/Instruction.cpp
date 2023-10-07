@@ -336,31 +336,52 @@ bool Instruction::IsComplex() const
   return Instruction::IsComplex(this->Op);
 }
 
-S32 Instruction::GetOperand(size_t index) const
+template <typename T>
+static ErrorOr<S32> verifyGetOpr(size_t index, const Instruction* instr)
 {
-  S32 ret;
+  auto errOrRef = instr->Operand<T>(index);
+  VERIFY(errOrRef);
 
-  switch( this->GetOperandType(index) )
-  {
-    case 'I': ret = this->Operand<S32>(index); break;
-    case 'S': ret = this->Operand<S16>(index); break;
-    case 'B': ret = this->Operand<S8 >(index); break;
-    case 's': ret = this->Operand<U16>(index); break;
-    case 'b': ret = this->Operand<U8 >(index); break;
-  }
-
-  return ret;
+  return S32{ errOrRef.Get().get() };
 }
 
-void Instruction::SetOperand(size_t index, S32 value) 
+ErrorOr<S32> Instruction::GetOperand(size_t index) const
 {
   switch( this->GetOperandType(index) )
   {
-    case 'I': this->Operand<S32>(index) = static_cast<S32>(value); break;
-    case 'S': this->Operand<S16>(index) = static_cast<S16>(value); break;
-    case 'B': this->Operand<S8 >(index) = static_cast<S8 >(value); break;
-    case 's': this->Operand<U16>(index) = static_cast<U16>(value); break;
-    case 'b': this->Operand<U8 >(index) = static_cast<U8 >(value); break;
+    case 'I': return verifyGetOpr<S32>(index, this);
+    case 'S': return verifyGetOpr<S16>(index, this);
+    case 'B': return verifyGetOpr<S8 >(index, this);
+    case 's': return verifyGetOpr<U16>(index, this);
+    case 'b': return verifyGetOpr<U8 >(index, this);
+
+    default: assert(false);
+  }
+}
+
+template <typename T>
+static ErrorOr<void> verifySetOpr(size_t index, S32 value, Instruction* instr)
+{
+  auto errOrRef = instr->Operand<T>(index);
+  VERIFY(errOrRef);
+
+  T& ref = errOrRef.Get().get();
+  ref = static_cast<T>(value);
+
+  return NoError{};
+}
+
+ErrorOr<void> Instruction::SetOperand(size_t index, S32 value) 
+{
+  switch( this->GetOperandType(index) )
+  {
+    case 'I': return verifySetOpr<S32>(index, value, this);
+    case 'S': return verifySetOpr<S16>(index, value, this);
+    case 'B': return verifySetOpr<S8 >(index, value, this);
+    case 's': return verifySetOpr<U16>(index, value, this);
+    case 'b': return verifySetOpr<U8 >(index, value, this);
+
+    default: assert(false);
   }
 }
 

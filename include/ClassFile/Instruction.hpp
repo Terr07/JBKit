@@ -248,21 +248,31 @@ class Instruction
   bool IsComplex() const;
 
   template <typename T>
-  T& Operand(size_t index)
+  ErrorOr< std::reference_wrapper<T> > Operand(size_t index)
   {
-    size_t offset = this->validateTypeAndGetOffset<T>(index);
-    return reinterpret_cast<T&>(this->operandBytes.data()[offset]);
+    ErrorOr<size_t> errOrOffset = this->validateTypeAndGetOffset<T>(index);
+
+    if(errOrOffset.IsError())
+      return errOrOffset.GetError();
+
+    T& ref = reinterpret_cast<T&>(this->operandBytes.data()[errOrOffset.Get()]);
+    return std::reference_wrapper<T>(ref);
   }
 
   template <typename T>
-  T Operand(size_t index) const
+  ErrorOr< std::reference_wrapper<const T> > Operand(size_t index) const
   {
-    size_t offset = this->validateTypeAndGetOffset<T>(index);
-    return reinterpret_cast<const T&>(this->operandBytes.data()[offset]);
+    ErrorOr<size_t> errOrOffset = this->validateTypeAndGetOffset<T>(index);
+
+    if(errOrOffset.IsError())
+      return errOrOffset.GetError();
+
+    const T& ref = reinterpret_cast<const T&>(this->operandBytes.data()[errOrOffset.Get()]);
+    return std::reference_wrapper<const T>(ref);
   }
 
-  S32 GetOperand(size_t index) const;
-  void SetOperand(size_t index, S32 value);
+  ErrorOr<S32> GetOperand(size_t index) const;
+  ErrorOr<void> SetOperand(size_t index, S32 value);
 
   private:
   std::vector<U8> operandBytes;
@@ -270,9 +280,11 @@ class Instruction
   Instruction() = default;
 
   template <typename T>
-  size_t validateTypeAndGetOffset(size_t index) const
+  ErrorOr<size_t> validateTypeAndGetOffset(size_t index) const
   {
-    assert(index < this->GetNOperands());
+    if(index < this->GetNOperands())
+      return Error::FromLiteralStr("index greater than operands size");
+
 
     switch( this->GetOperandType(index) )
     {
