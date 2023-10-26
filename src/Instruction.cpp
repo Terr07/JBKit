@@ -256,11 +256,11 @@ size_t Instruction::GetNOperands(Instruction::Opcode op)
 Instruction::OperandType Instruction::GetOperandType(Instruction::Opcode op, size_t index) 
 {
   assert( format(op).empty()       ||
-      format(op)[index] == 'I' ||
-      format(op)[index] == 'S' ||
-      format(op)[index] == 'B' ||
-      format(op)[index] == 's' ||
-      format(op)[index] == 'b'   );
+          format(op)[index] == 'I' ||
+          format(op)[index] == 'S' ||
+          format(op)[index] == 'B' ||
+          format(op)[index] == 's' ||
+          format(op)[index] == 'b'   );
 
   return static_cast<Instruction::OperandType>(format(op)[index]);
 }
