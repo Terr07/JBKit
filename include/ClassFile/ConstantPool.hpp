@@ -152,27 +152,14 @@ class ConstantPool
     template <class T = CPInfo>
     ErrorOr< std::reference_wrapper<T> > Get(U16 index) const
     {
-      if(index >= m_pool.size() || index == 0)
-      {
-        return Error::FromFormatStr("ConstantPool.Get(%u) failed because given index is outside the pools range (1-%u)", 
-            static_cast<unsigned int>(index), 
-            static_cast<unsigned int>(this->GetCount()));
-      }
-
-      if (m_pool[index].get() == nullptr)
-      {
-        return Error::FromFormatStr("ConstantPool.Get(%u) failed because constant at given index is nullptr", 
-            static_cast<unsigned int>(index));
-      }
+      auto errOrValid = validateIndexAccess(index);
+      if(errOrValid.IsError())
+        return errOrValid.GetError();
 
       T* ptr = dynamic_cast<T*>( m_pool[index].get() );
 
       if (ptr == nullptr)
-      {
-        return Error::FromFormatStr("ConstantPool.Get<%s>(%u) failed to convert CPInfo to requested type (dynamic cast failed)", 
-            typeid(T).name(), 
-            static_cast<unsigned int>(index));
-      }
+        return failedCastError(index, typeid(T).name());
 
       return *ptr;
     }
@@ -183,6 +170,9 @@ class ConstantPool
     U16 GetSize() const;
     U16 GetCount() const;
   private:
+    ErrorOr<void> validateIndexAccess(U16 index) const;
+    ErrorOr<void> failedCastError(U16 index, std::string_view castToName) const;
+
     std::vector< std::unique_ptr<CPInfo> > m_pool;
 };
 

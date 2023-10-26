@@ -19,6 +19,7 @@ ErrorOr<void> Serializer::SerializeClassFile(std::ostream& stream, const ClassFi
                                cf.SuperClass,
                                static_cast<U16>(cf.Interfaces.size())));
 
+
   for(U16 interface : cf.Interfaces)
     TRY(Write<BigEndian>(stream, interface));
 
@@ -183,7 +184,7 @@ ErrorOr<void> Serializer::SerializeConstant(std::ostream& stream, const CPInfo& 
     case CPInfo::Type::InvokeDynamic: return writeConstT<InvokeDynamicInfo>(stream, info);
   }
 
-  return Error::FromFormatStr("WriteConstant: write func not implemented for const with tag %hhu", tag);
+  return Error{ fmt::format("Serializer::WriteConstant(): encountered unknown tag {}", tag) };
 }
 
 ErrorOr<void> Serializer::SerializeFieldMethod(std::ostream& stream, const FieldMethodInfo& info)
@@ -205,7 +206,7 @@ static ErrorOr<void> writeAttr(std::ostream& stream, const RawAttribute& attr)
   stream.write(reinterpret_cast<const char*>(attr.Bytes.data()), attr.GetLength());
 
   if(stream.bad())
-    return Error::FromFormatStr("failed to write attribute, stream badbit set: %s in %s", __func__, __FILE__);
+    return Error{ fmt::format("Serializer::writeAttr(): failed to write attribute.") };
 
   return {};
 }
@@ -275,16 +276,16 @@ ErrorOr<void> Serializer::SerializeAttribute(std::ostream& stream, const Attribu
     case AttributeInfo::Type::Raw:           return writeAttrT<RawAttribute>(stream, info);
   }
 
-  //TODO: stop using old c printf for formattting, as it isn't compatible with
-  //things like non-null terminated std::string_view
-  return Error::FromFormatStr("WriteAttribute: write func not implemented for attribute with name \"%.*s\"", info.GetName().length(), info.GetName().data());
+  return Error{ fmt::format("Serializer::WriteAttribute(): encountered unknown "
+      "attribute \"{}\".", info.GetName()) };
 }
 
 template <typename T>
 static ErrorOr<void> writeOperand(std::ostream& stream, const Instruction& instr, size_t i)
 {
   auto errOrRef = instr.Operand<T>(i);
-  VERIFY(errOrRef);
+  VERIFY(errOrRef, 
+      fmt::format("failed to access operand {}, of \"{}\"", i, instr.GetMnemonic()));
 
   TRY(Write<BigEndian>(stream, errOrRef.Get().get()));
 
@@ -294,7 +295,8 @@ static ErrorOr<void> writeOperand(std::ostream& stream, const Instruction& instr
 ErrorOr<void> Serializer::SerializeInstruction(std::ostream& stream, const Instruction& instr)
 {
   if(instr.IsComplex())
-    return Error::FromLiteralStr("SerializeInstruction not implemented for complex instructions");
+    return Error{ fmt::format("Serializer::SerializeInstruction(): \"{}\" is a "
+        "complex instruciton which serialization is not yet implemented for.", instr.GetMnemonic()) };
 
   TRY(Write<BigEndian>(stream, instr.Op));
 
@@ -303,11 +305,11 @@ ErrorOr<void> Serializer::SerializeInstruction(std::ostream& stream, const Instr
     switch( instr.GetOperandType(i) )
     {
       using type = Instruction::OperandType;
-      case type::TypeS32: TRY(Write<BigEndian>(stream, instr.Operand<S32>(i))) break;
-      case type::TypeS16: TRY(Write<BigEndian>(stream, instr.Operand<S16>(i))) break;
-      case type::TypeS8 : TRY(Write<BigEndian>(stream, instr.Operand<S8 >(i))) break;
-      case type::TypeU16: TRY(Write<BigEndian>(stream, instr.Operand<U16>(i))) break;
-      case type::TypeU8 : TRY(Write<BigEndian>(stream, instr.Operand<U8 >(i))) break;
+      case type::TypeS32: TRY( writeOperand<S32>(stream, instr, i) ); break;
+      case type::TypeS16: TRY( writeOperand<S16>(stream, instr, i) ); break;
+      case type::TypeS8 : TRY( writeOperand<S8 >(stream, instr, i) ); break;
+      case type::TypeU16: TRY( writeOperand<U16>(stream, instr, i) ); break;
+      case type::TypeU8 : TRY( writeOperand<U8 >(stream, instr, i) ); break;
     }
   }
 

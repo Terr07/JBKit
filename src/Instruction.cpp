@@ -1,6 +1,8 @@
 #define _DONT_UNDEF_ITERATE_OpcodeS
 #include "ClassFile/Instruction.hpp"
 
+#include <fmt/core.h>
+
 #include "Util/IO.hpp"
 #include "Util/Error.hpp"
 
@@ -383,5 +385,17 @@ ErrorOr<void> Instruction::SetOperand(size_t index, S32 value)
 
     default: assert(false);
   }
+}
+
+Error Instruction::oobError(size_t index) const
+{
+  return Error{ fmt::format("Instruction: out-of-bounds operand access "
+      "at index {}, instruction has {} operand(s).", index, this->GetNOperands())};
+}
+
+Error Instruction::castError(size_t index, std::string_view type) const
+{
+  return Error{ fmt::format("Instruction: invalid operand type cast at index {}, "
+      "failed to cast to \"{}\"", index, type)};
 }
 

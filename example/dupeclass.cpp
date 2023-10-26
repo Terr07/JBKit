@@ -35,7 +35,7 @@ int main(int argc, char** argv)
 
   if(errOrClass.IsError())
   {
-    std::cout << "PARSING ERROR: " << errOrClass.GetError().GetMessage() << '\n';
+    std::cout << "PARSING ERROR: " << errOrClass.GetError().What << '\n';
     return -3;
   }
 
@@ -58,7 +58,7 @@ int main(int argc, char** argv)
 
   if(err.IsError())
   {
-    std::cout << "SERIALIZATION ERROR: " << err.GetError().GetMessage() << '\n';
+    std::cout << "SERIALIZATION ERROR: " << err.GetError().What << '\n';
     return -5;
   }
 

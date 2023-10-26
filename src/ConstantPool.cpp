@@ -1,5 +1,7 @@
 #include "ClassFile/ConstantPool.hpp"
 
+#include <fmt/core.h>
+
 #include <map>
 #include <cassert>
 
@@ -116,6 +118,29 @@ const CPInfo* ConstantPool::operator[](U16 index) const
     return nullptr;
 
   return m_pool[index].get();
+}
+
+ErrorOr<void> ConstantPool::validateIndexAccess(U16 index) const
+{
+  if(index >= m_pool.size() || index == 0)
+  {
+    return Error{fmt::format("ConstantPool: "
+        "out-of-bounds access at index {}, valid index range for "
+        "pool is 1-{}", index, this->GetCount())};
+  }
+
+  if (m_pool[index].get() == nullptr)
+  {
+    return Error{fmt::format("ConstantPool: " 
+        "nullptr access at index {}", index)};
+  }
+}
+
+ErrorOr<void> ConstantPool::failedCastError(U16 index, std::string_view castToName) const
+{
+  return Error{fmt::format("ConstantPool: " 
+      "invalid type cast access at index {}"
+      ", failed to cast to type \"{}\"", index, castToName)};
 }
 
 } //namespace ClassFile

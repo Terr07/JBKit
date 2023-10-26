@@ -150,7 +150,7 @@ void PrintInstrInfo(const ClassFile::Instruction& instr)
   {
     std::cout << GetOperandTypeName(instr.GetOperandType(i));
     std::cout << "{";
-    std::cout <<  instr.GetOperand(i);
+    std::cout <<  instr.GetOperand(i).Get();
     std::cout << "}";
 
     if(i + 1 != instr.GetNOperands())
@@ -369,7 +369,7 @@ int main(int argc, char** argv)
 
   if(errOrClass.IsError())
   {
-    std::cout << "ERROR: " << errOrClass.GetError().GetMessage() << '\n';
+    std::cout << "ERROR: " << errOrClass.GetError().What << '\n';
     return -1;
   }
 

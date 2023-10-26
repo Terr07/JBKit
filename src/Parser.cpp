@@ -1,7 +1,11 @@
 #include "ClassFile/Parser.hpp"
 
+#include <fmt/core.h>
+
 #include "Util/IO.hpp"
 #include "Util/Error.hpp"
+
+#include <cxxabi.h>
 
 #include <iostream>
 #include <cassert>
@@ -179,11 +183,12 @@ static ErrorOr<void> readConst(std::istream& stream, UTF8Info& info)
   U16 len;
   TRY(Read<BigEndian>(stream, len));
 
+  //TODO: add IO util func for this
   info.String = std::string(len, '\0');
   stream.read(&info.String[0], len);
 
   if (stream.bad())
-    return Error::FromFormatStr("failed to read UTF8 const string. Stream badbit set after read. (streampos = 0x%X)", stream.tellg());
+    return Error{fmt::format("Parser::readConst(UTF8Info): failed to read string")};
 
   return {};
 }
@@ -238,7 +243,8 @@ ErrorOr< std::unique_ptr<CPInfo> > Parser::ParseConstant(std::istream& stream)
     case CPInfo::Type::InvokeDynamic: return parseConstT<InvokeDynamicInfo>(stream);
   }
 
-  return Error::FromFormatStr("ParseConstant encountered unknown tag: 0x%X (streampos = 0x%X)", static_cast<U8>(type), stream.tellg());
+  return Error{fmt::format("Parser::ParseConstant: encountered unknown tag "
+      "value \"{}\"", static_cast<U8>(type))};
 }
 
 ErrorOr<FieldMethodInfo> Parser::ParseFieldMethodInfo(
@@ -308,7 +314,9 @@ static ErrorOr<void> readAttribute(std::istream& stream,
 
   if(parsedCodeLen != codeLen)
   {
-    return Error::FromFormatStr("Failed parsing code attribute. \"CodeLen\" field parsed as %u but actual parsed codelen is at least %u bytes", static_cast<size_t>(codeLen), static_cast<size_t>(parsedCodeLen));
+    return Error{fmt::format("Parser::readAttribute(CodeAttr): "
+        "CodeLen field indicates codelen of: {}, "
+        "but total code bytes parsed was: {}.", codeLen, parsedCodeLen)};
   }
 
   //TODO: create a read util function for these sorts of 
@@ -356,10 +364,9 @@ static ErrorOr< std::unique_ptr<AttributeInfo> > parseAttributeT(
   U32 attrLen = attr->GetLength();
   if(attrLen != len)
   {
-    return Error::FromFormatStr("Parsed attribute type \"%.*s\"" 
-        " doesnt have the correct length (expected: %u, actual: %u)", 
-        static_cast<int>(attr->GetName().size()), attr->GetName().data(), 
-        len, attrLen);
+    return Error{ fmt::format("Parser::parseAttributeT<{}>(): "
+        "AttrLen field indicates len of: {}, "
+        "but total len of parsed bytes was: {}", typeid(AttributeT).name(), len, attrLen)};
   }
 
   return std::unique_ptr<AttributeInfo>(attr);
@@ -379,7 +386,7 @@ ErrorOr< std::unique_ptr<AttributeInfo> > Parser::ParseAttribute(
   AttributeInfo::Type type;
   if (errOrType.IsError())
   {
-    std::cerr << "[WARNING]: " << errOrType.GetError().GetMessage();
+    std::cerr << "[WARNING]: " << errOrType.GetError().What;
     std::cerr << " (interpreting as raw attribute instead)\n";
     type = AttributeInfo::Type::Raw;
   }
@@ -417,7 +424,8 @@ template <typename T>
 static ErrorOr<void> readOperand(std::istream& stream, Instruction& instr, size_t i)
 {
   auto errOrRef = instr.Operand<T>(i);
-  VERIFY(errOrRef);
+  VERIFY(errOrRef, 
+      fmt::format("failed to access operand {} of \"{}\"", i, instr.GetMnemonic()));
 
   TRY(Read<BigEndian>(stream, errOrRef.Get().get()));
 
@@ -432,7 +440,11 @@ ErrorOr<Instruction> Parser::ParseInstruction(std::istream& stream)
   Instruction instr = Instruction::MakeInstruction(op).Get();
 
   if(instr.IsComplex())
-    return Error::FromLiteralStr("complex instruction parsing not implemented");
+  {
+    return Error{fmt::format("Parser::ParserInstruction(): "
+        "encountered complex instruction: \"{}\", "
+        "which parsing is not implemented for yet.", instr.GetMnemonic())};
+  }
 
   for(size_t i{0}; i < instr.GetNOperands(); i++)
   {

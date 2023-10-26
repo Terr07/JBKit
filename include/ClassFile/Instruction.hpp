@@ -279,21 +279,34 @@ class Instruction
 
   Instruction() = default;
 
+
+  template <typename T>
+  bool isValidType(size_t index) const
+  {
+    switch( this->GetOperandType(index) )
+    {
+      case TypeS32: return {typeid(T) == typeid(S32)}; 
+      case TypeS16: return {typeid(T) == typeid(S16)}; 
+      case TypeS8:  return {typeid(T) == typeid(S8) }; 
+      case TypeU16: return {typeid(T) == typeid(U16)}; 
+      case TypeU8:  return {typeid(T) == typeid(U8) }; 
+    }
+
+    return false;
+  }
+
+  Error oobError(size_t) const;
+  Error castError(size_t, std::string_view) const;
+
+
   template <typename T>
   ErrorOr<size_t> validateTypeAndGetOffset(size_t index) const
   {
-    if(index < this->GetNOperands())
-      return Error::FromLiteralStr("index greater than operands size");
+    if(index >= this->GetNOperands())
+      return oobError(index);
 
-
-    switch( this->GetOperandType(index) )
-    {
-      case TypeS32: assert( typeid(T) == typeid(S32) ); break;
-      case TypeS16: assert( typeid(T) == typeid(S16) ); break;
-      case TypeS8:  assert( typeid(T) == typeid(S8)  ); break;
-      case TypeU16: assert( typeid(T) == typeid(U16) ); break;
-      case TypeU8:  assert( typeid(T) == typeid(U8)  ); break;
-    }
+    if(!isValidType<T>(index))
+      return castError(index, typeid(T).name());
 
     size_t offset{0};
     for(size_t i{0}; i < index; ++i)

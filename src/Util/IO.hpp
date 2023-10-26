@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fmt/core.h"
+
 #include "ClassFile/Defs.hpp"
 #include "ClassFile/Error.hpp"
 
@@ -45,7 +47,10 @@ ErrorOr<void> Read(std::istream& stream, T& t)
   stream.read(reinterpret_cast<char*>(&t), sizeof(T));
 
   if (stream.bad())
-    return Error::FromFormatStr("Read() failed: streams badbit got set after read. (steampos = 0x%X) (T = %s) (sizeof T = %u)", stream.tellg(), typeid(T).name(), sizeof(T));
+  {
+    return Error{fmt::format("Read: stream went bad at 0x{0:x} after trying to "
+        "read a \"{}\" ({} bytes)", static_cast<size_t>(stream.tellg()), typeid(T).name(), sizeof(T))};
+  }
 
   if (Order != GetHostByteOrder())
     SwapByteOrder(t);
@@ -68,7 +73,10 @@ ErrorOr<void> Write(std::ostream& stream, const T& t)
   }
 
   if (stream.bad())
-    return Error::FromFormatStr("Write() failed: streams badbit got set after write. (steampos = 0x%X) (T = %s) (sizeof T = %u)", stream.tellp(), typeid(T).name(), sizeof(T));
+  {
+    return Error{fmt::format("Write: stream went bad at 0x{0:x} after trying to "
+        "write a \"{}\" ({} bytes)", static_cast<size_t>(stream.tellp()), typeid(T).name(), sizeof(T))};
+  }
 
   return {};
 }

@@ -1,5 +1,7 @@
 #include "ClassFile/Attribute.hpp"
 
+#include <fmt/core.h>
+
 #include <map>
 #include <cassert>
 
@@ -26,16 +28,16 @@ std::string_view AttributeInfo::GetTypeName(AttributeInfo::Type type)
   return std::get<1>(*itr);
 }
 
-ErrorOr<AttributeInfo::Type> AttributeInfo::GetType(std::string_view str) 
+ErrorOr<AttributeInfo::Type> AttributeInfo::GetType(std::string_view name) 
 {
   for (auto itr : typeNames)
   {
-    if (str == std::get<1>(itr))
+    if (name == std::get<1>(itr))
       return std::get<0>(itr);
   }
 
-  return Error::FromFormatStr("AttributeInfo::GetType called with unknown type name \"%.*s\"", 
-      str.size(), str.data());
+  return Error{ fmt::format("AttributeInfo::GetType(): requested type for "
+      "unknown type name: \"{}\"", name) };
 }
 
 std::string_view AttributeInfo::GetName() const

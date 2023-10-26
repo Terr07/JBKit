@@ -6,6 +6,16 @@ set(CMAKE_CXX_STANDARD 17)
 add_compile_options("-pedantic")
 add_compile_options("-Wall")
 
+include(FetchContent)
+
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt
+  )
+
+FetchContent_MakeAvailable(fmt)
+
+
 add_library(ClassFile "src/Parser.cpp"
                       "src/Serializer.cpp" 
                       "src/Instruction.cpp" 
@@ -15,6 +25,7 @@ add_library(ClassFile "src/Parser.cpp"
 target_include_directories(ClassFile PRIVATE "src")
 target_include_directories(ClassFile PUBLIC "include")
 
+target_link_libraries(ClassFile PRIVATE fmt)
 
 add_executable(readclass "example/readclass.cpp")
 target_link_libraries(readclass PUBLIC ClassFile)
