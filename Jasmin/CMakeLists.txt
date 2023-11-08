@@ -24,11 +24,11 @@ target_include_directories(Jasmin PUBLIC "include")
 
 target_link_libraries(Jasmin PRIVATE fmt)
 
+add_subdirectory("${PROJECT_SOURCE_DIR}/../ClassFile" "ClassFile")
+target_link_libraries(Jasmin PUBLIC ClassFile)
+
 if(EXISTS "${PROJECT_SOURCE_DIR}/spike/")
   add_executable(spike "spike/spike.cpp")
   target_link_libraries(spike PUBLIC Jasmin)
 endif()
-
-add_executable(spike "spike/spike.cpp")
-target_link_libraries(spike PUBLIC Jasmin)
 
