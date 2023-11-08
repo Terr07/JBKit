@@ -32,4 +32,3 @@ target_link_libraries(readclass PUBLIC ClassFile)
 
 add_executable(dupeclass "example/dupeclass.cpp")
 target_link_libraries(dupeclass PUBLIC ClassFile)
-
