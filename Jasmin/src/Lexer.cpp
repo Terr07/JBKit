@@ -146,16 +146,14 @@ void Lexer::skipComments()
 
 Lexeme Lexer::lexStringLiteral()
 {
-  ensureNext('"');
-  get();
+  get('"');
 
   std::string str;
 
   while(peek() != '"' && peek() != EOF)
     str += get();
 
-  ensureNext('"');
-  get();
+  get('"');
 
   return makeLex(Lexeme::TokenType::StringLiteral, str);
 }
@@ -245,6 +243,11 @@ Lexeme Lexer::makeLex(Lexeme::TokenType type, char c) const
   return makeLex(type, std::string{c});
 }
 
+char Lexer::get(char c)
+{
+  ensureNext(c);
+  return get();
+}
 
 char Lexer::get()
 {

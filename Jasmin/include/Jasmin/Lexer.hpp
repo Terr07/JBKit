@@ -78,6 +78,7 @@ class Lexer
     Lexeme makeLex(Lexeme::TokenType type, char c) const;
 
     char get();
+    char get(char);
     char peek();
     void ensureNext(char);
     void ensureNext(std::function<bool(char)>);
