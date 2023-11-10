@@ -4,7 +4,7 @@
 
 using namespace Jasmin;
 
-Lexeme::Lexeme(TokenType type, std::string val)
+Lexeme::Lexeme(TokenType type, std::string_view val)
 : Type{type}, Value{val} {}
 
 Lexeme::Lexeme(TokenType type, char val)
@@ -27,7 +27,6 @@ std::string_view Lexeme::GetTypeString(TokenType type)
     {TokenType::ArithmeticOperator, "ArithmeticOperator"},
     {TokenType::Newline,            "Newline"},
     {TokenType::Colon,              "Colon"},
-    {TokenType::Dot,                "Dot"},
     {TokenType::Bracket,            "Bracket"},
     {TokenType::Brace,              "Brace"},
     {TokenType::Paren,              "Paren"},
@@ -41,6 +40,84 @@ double Lexeme::GetNumericValue() const
   return std::stod(this->Value);
 }
 
+static const std::unordered_map<std::string_view, DirectiveType> strDirMap =
+{
+  {"catch"     , DirectiveType::Catch     },
+  {"class"     , DirectiveType::Class     },
+  {"end"       , DirectiveType::End       },
+  {"field"     , DirectiveType::Field     },
+  {"implements", DirectiveType::Implements},
+  {"interface" , DirectiveType::Interface },
+  {"limit"     , DirectiveType::Limit     },
+  {"line"      , DirectiveType::Line      },
+  {"method"    , DirectiveType::Method    },
+  {"source"    , DirectiveType::Source    },
+  {"super"     , DirectiveType::Super     },
+  {"throws"    , DirectiveType::Throws    },
+  {"var"       , DirectiveType::Var       },
+};
+
+static const std::unordered_map<DirectiveType, std::string_view> dirStrMap = 
+{
+  {DirectiveType::Catch     , "catch"     },
+  {DirectiveType::Class     , "class"     },
+  {DirectiveType::End       , "end"       },
+  {DirectiveType::Field     , "field"     },
+  {DirectiveType::Implements, "implements"},
+  {DirectiveType::Interface , "interface" },
+  {DirectiveType::Limit     , "limit"     },
+  {DirectiveType::Line      , "line"      },
+  {DirectiveType::Method    , "method"    },
+  {DirectiveType::Source    , "source"    },
+  {DirectiveType::Super     , "super"     },
+  {DirectiveType::Throws    , "throws"    },
+  {DirectiveType::Var       , "var"       },
+};
+
+bool Jasmin::IsDirectiveType(std::string_view str)
+{
+  return strDirMap.find(str) != strDirMap.end();
+}
+
+DirectiveType Jasmin::DirectiveTypeFromStr(std::string_view str)
+{
+  return DirectiveType{strDirMap.at(str)};
+}
+
+std::string Jasmin::ToString(DirectiveType dir)
+{
+  return std::string{dirStrMap.at(dir)};
+}
+
+bool Jasmin::IsKeyword(std::string_view str) 
+{
+  std::unordered_set<std::string_view> keywords = 
+  {
+    "public",
+    "private",
+    "protected",
+    "static",
+    "volatile",
+    "transient",
+    "final",
+    "abstract",
+    "native",
+    "synchronized",
+  };
+
+  return keywords.find(str) != keywords.end();
+}
+
+std::queue<Lexeme> Lexer::Lex(const char* file)
+{
+  Lexer lexer{file};
+
+  while(lexer.hasMoreAfterSkip())
+    lexer.lexemes.emplace(lexer.lexNext());
+
+  return std::move(lexer.lexemes);
+}
+
 Lexer::Lexer(const char* file) 
 : inputStream{file, std::ios::binary} 
 {
@@ -48,14 +125,14 @@ Lexer::Lexer(const char* file)
     throw std::runtime_error{"failed to open file."};
 }
 
-bool Lexer::HasMoreAfterSkip() 
+bool Lexer::hasMoreAfterSkip() 
 {
   skipWhitespace();
   skipComments();
   return peek() != EOF;
 }
 
-Lexeme Lexer::LexNext()
+Lexeme Lexer::lexNext()
 {
   skipWhitespace();
   skipComments();
@@ -64,17 +141,16 @@ Lexeme Lexer::LexNext()
 
   if(ch == '.')
   {
-    ch = get();
-    Lexeme nextLexeme = LexNext();
+    get();
+    Lexeme next = lexNext();
 
-    if(nextLexeme.Type != Lexeme::TokenType::String)
-      return makeLex(Lexeme::TokenType::Dot, ch);
+    if(next.Type != Lexeme::TokenType::String)
+      throw error("Expected string token as directive name after \'.\' character.");
 
-    if(isDirectiveName(nextLexeme.Value))
-      return makeLex(Lexeme::TokenType::Directive, nextLexeme.Value);
+    if(!Jasmin::IsDirectiveType(next.Value))
+      throw error( fmt::format("\"{}\" is not a valid directive.", next.Value));
 
-    throw error( 
-        fmt::format("expected directive name after '.' but got \"{}\"", nextLexeme.Value));
+    return makeLex(Lexeme::TokenType::Directive, next.Value);
   }
 
   if(ch == ':')
@@ -105,23 +181,13 @@ Lexeme Lexer::LexNext()
   {
     Lexeme strLex = lexString();
 
-    if(isKeyword(strLex.Value))
+    if(Jasmin::IsKeyword(strLex.Value))
       return makeLex(Lexeme::TokenType::Keyword, strLex.Value);
     else
       return strLex;
   }
 
   throw error(fmt::format("encountered unknown lexeme value \"{}\"", ch));
-}
-
-std::queue<Lexeme> Lexer::LexAll()
-{
-  std::queue<Lexeme> lexemes;
-
-  while(this->HasMoreAfterSkip())
-    lexemes.emplace(this->LexNext());
-
-  return lexemes;
 }
 
 void Lexer::skipWhitespace()
@@ -186,48 +252,7 @@ Lexeme Lexer::lexString()
   return makeLex(Lexeme::TokenType::String, str);
 }
 
-bool Lexer::isKeyword(std::string_view str) 
-{
-  std::unordered_set<std::string_view> keywords = 
-  {
-    "public",
-    "private",
-    "protected",
-    "static",
-    "volatile",
-    "transient",
-    "final",
-    "abstract",
-    "native",
-    "synchronized",
-  };
-
-  return keywords.find(str) != keywords.end();
-}
-
-bool Lexer::isDirectiveName(std::string_view str) 
-{
-  std::unordered_set<std::string_view> directiveNames = 
-  {
-    "catch",
-    "class",
-    "end",
-    "field",
-    "implements",
-    "interface",
-    "limit",
-    "line",
-    "method",
-    "source",
-    "super",
-    "throws",
-    "var",
-  };
-
-  return directiveNames.find(str) != directiveNames.end();
-}
-
-Lexeme Lexer::makeLex(Lexeme::TokenType type, std::string c) const
+Lexeme Lexer::makeLex(Lexeme::TokenType type, std::string_view c) const
 {
   auto lexeme = Lexeme{type, c};
 

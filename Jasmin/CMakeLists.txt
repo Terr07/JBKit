@@ -16,9 +16,8 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(fmt)
 
-add_library(Jasmin     "src/AstNodes.cpp"
-                       "src/Lexer.cpp"
-                       "src/Parser.cpp")
+add_library(Jasmin     "src/Lexer.cpp"
+                       "src/Assembler.cpp")
 
 target_include_directories(Jasmin PUBLIC "include")
 

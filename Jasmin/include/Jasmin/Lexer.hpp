@@ -33,37 +33,52 @@ struct Lexeme
   std::string Value;
   double GetNumericValue() const;
 
-  Lexeme(TokenType type, std::string val);
+  Lexeme(TokenType type, std::string_view val);
   Lexeme(TokenType type, char val);
 
   std::string_view GetTypeString() const;
   static std::string_view GetTypeString(TokenType);
 };
 
+enum class DirectiveType 
+{
+  Catch,
+  Class,
+  End,
+  Field,
+  Implements,
+  Interface,
+  Limit,
+  Line,
+  Method,
+  Source,
+  Super,
+  Throws,
+  Var,
+};
+
+bool IsDirectiveType(std::string_view);
+DirectiveType DirectiveTypeFromStr(std::string_view);
+std::string ToString(DirectiveType);
+
+bool IsKeyword(std::string_view);
+
 class Lexer
 {
-
   public:
-    Lexer(const char* file);
-
-    bool HasMoreAfterSkip();
-    Lexeme LexNext();
-    std::queue<Lexeme> LexAll();
+    static std::queue<Lexeme> Lex(const char* file);
 
   private:
-    std::ifstream  inputStream;
-    unsigned int   lineNumber{1};
-    unsigned short lineOffset{1};
-    size_t         fileOffset{0};
+    Lexer(const char* file);
 
-
+    bool hasMoreAfterSkip();
     void skipWhitespace();
     void skipComments();
+
+    Lexeme lexNext();
     Lexeme lexStringLiteral();
     Lexeme lexNumericLiteral();
     Lexeme lexString();
-    static bool isKeyword(std::string_view);
-    static bool isDirectiveName(std::string_view);
 
     //allows passing to ensureNext. Apparently standard library functions such 
     //as std::isdigit, aren't addressable so need wrappers like this to be passed
@@ -74,7 +89,7 @@ class Lexer
     static bool isSpace(char c) { return std::isspace(c); }
     static bool isPunct(char c) { return std::ispunct(c); }
 
-    Lexeme makeLex(Lexeme::TokenType type, std::string c) const;
+    Lexeme makeLex(Lexeme::TokenType type, std::string_view c) const;
     Lexeme makeLex(Lexeme::TokenType type, char c) const;
 
     char get();
@@ -84,6 +99,15 @@ class Lexer
     void ensureNext(std::function<bool(char)>);
 
     std::runtime_error error(std::string_view) const;
+
+  private:
+    std::ifstream  inputStream;
+
+    std::queue<Lexeme> lexemes;
+
+    unsigned int   lineNumber{1};
+    unsigned short lineOffset{1};
+    size_t         fileOffset{0};
 };
 
 } //namespace: Jasmin
