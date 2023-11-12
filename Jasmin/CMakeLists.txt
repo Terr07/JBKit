@@ -17,7 +17,8 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fmt)
 
 add_library(Jasmin     "src/Lexer.cpp"
-                       "src/Assembler.cpp")
+                       "src/Assembler.cpp"
+                       "src/Disassembler.cpp")
 
 target_include_directories(Jasmin PUBLIC "include")
 
