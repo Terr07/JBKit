@@ -11,6 +11,7 @@ include(FetchContent)
 FetchContent_Declare(
   fmt
   GIT_REPOSITORY https://github.com/fmtlib/fmt
+  GIT_TAG f5e54359df4c26b6230fc61d38aa294581393084 #v10.1.1
   )
 
 FetchContent_MakeAvailable(fmt)
