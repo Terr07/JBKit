@@ -1,4 +1,5 @@
 #include "ClassFile/ConstantPool.hpp"
+#include "Util/Error.hpp"
 
 #include <fmt/core.h>
 
@@ -51,35 +52,109 @@ void ConstantPool::Reserve(U16 n)
   m_pool.reserve(n);
 }
 
-std::string_view ConstantPool::GetConstNameOrTypeStr(U16 index) const
+template <typename T>
+static ErrorOr<std::string_view> getName(U16 index, const ConstantPool& cp)
 {
-  const auto* ptr = (*this)[index];
+  auto errOrPtr = cp.Get<T>(index);
+  VERIFY(errOrPtr);
 
-  if(ptr == nullptr)
-    return "???";
+  auto errOrSV = cp.LookupString(errOrPtr.Get()->NameIndex);
+  VERIFY(errOrSV);
 
-  if(ptr->GetType() == CPInfo::Type::UTF8)
+  return errOrSV.Get();
+}
+
+template <typename T>
+static ErrorOr<std::string_view> getNameByNameAndTypeIndex(U16 index, const ConstantPool& cp)
+{
+  auto errOrPtr = cp.Get<T>(index);
+  VERIFY(errOrPtr);
+
+  return getName<NameAndTypeInfo>(errOrPtr.Get()->NameAndTypeIndex, cp);
+}
+
+ErrorOr<std::string_view> ConstantPool::LookupString(U16 index) const
+{
+  TRY(ensureValid(index));
+
+  switch(m_pool[index]->GetType())
   {
-    auto utf8Info = static_cast<const UTF8Info*>(ptr);
-    return utf8Info->String;
+    case CPInfo::Type::String:
+    case CPInfo::Type::UTF8:
+      return lookupStringOrUTF8(index);
+
+    case CPInfo::Type::Class:
+      return getName<ClassInfo>(index, *this);
+    case CPInfo::Type::NameAndType:
+      return getName<NameAndTypeInfo>(index, *this);
+
+    case CPInfo::Type::Fieldref:
+      return getNameByNameAndTypeIndex<FieldrefInfo>(index, *this);
+
+    case CPInfo::Type::Methodref:
+      return getNameByNameAndTypeIndex<MethodrefInfo>(index, *this);
+
+    case CPInfo::Type::InterfaceMethodref:
+      return getNameByNameAndTypeIndex<InterfaceMethodrefInfo>(index, *this);
+
+    case CPInfo::Type::InvokeDynamic:
+      return getNameByNameAndTypeIndex<InvokeDynamicInfo>(index, *this);
   }
 
-  if(ptr->GetType() == CPInfo::Type::String)
+  return Error{fmt::format("ConstantPool: Failed to lookup name "
+      "string for constant info entry and index {} (type: {})", 
+      index, m_pool[index]->GetName())};
+}
+
+template <typename T>
+static ErrorOr<std::string_view> getDescriptor(U16 index, const ConstantPool& cp)
+{
+  auto errOrPtr = cp.Get<T>(index);
+  VERIFY(errOrPtr);
+
+  auto errOrSV = cp.LookupString(errOrPtr.Get()->DescriptorIndex);
+  VERIFY(errOrSV);
+
+  return errOrSV.Get();
+}
+
+template <typename T>
+static ErrorOr<std::string_view> getDescriptorByNameAndTypeIndex(U16 index, const ConstantPool& cp)
+{
+  auto errOrPtr = cp.Get<T>(index);
+  VERIFY(errOrPtr);
+
+  return getDescriptor<NameAndTypeInfo>(errOrPtr.Get()->NameAndTypeIndex, cp);
+}
+
+ErrorOr<std::string_view> ConstantPool::LookupDescriptor(U16 index) const
+{
+  TRY(ensureValid(index));
+
+  switch(m_pool[index]->GetType())
   {
-    auto stringInfo = static_cast<const StringInfo*>(ptr);
-    return this->GetConstNameOrTypeStr(stringInfo->StringIndex);
+    case CPInfo::Type::MethodType:
+      return getDescriptor<MethodTypeInfo>(index, *this);
+
+    case CPInfo::Type::NameAndType:
+      return getDescriptor<NameAndTypeInfo>(index, *this);
+
+    case CPInfo::Type::Fieldref:
+      return getDescriptorByNameAndTypeIndex<FieldrefInfo>(index, *this);
+
+    case CPInfo::Type::Methodref:
+      return getDescriptorByNameAndTypeIndex<MethodrefInfo>(index, *this);
+
+    case CPInfo::Type::InterfaceMethodref:
+      return getDescriptorByNameAndTypeIndex<InterfaceMethodrefInfo>(index, *this);
+
+    case CPInfo::Type::InvokeDynamic:
+      return getDescriptorByNameAndTypeIndex<InvokeDynamicInfo>(index, *this);
   }
 
-  if(ptr->GetType() == CPInfo::Type::Class)
-  {
-    auto classInfo = static_cast<const ClassInfo*>(ptr);
-    return this->GetConstNameOrTypeStr(classInfo->NameIndex);
-  }
-
-  //TODO: implement for more types
-
-  assert(false);
-  return "???";
+  return Error{fmt::format("ConstantPool: Failed to lookup descriptor "
+      "string for constant info entry and index {} (type: {})", 
+      index, m_pool[index]->GetName())};
 }
 
 void ConstantPool::Add(std::unique_ptr<CPInfo>&& info) 
@@ -120,7 +195,21 @@ const CPInfo* ConstantPool::operator[](U16 index) const
   return m_pool[index].get();
 }
 
-ErrorOr<void> ConstantPool::validateIndexAccess(U16 index) const
+ErrorOr<std::string_view> ConstantPool::lookupStringOrUTF8(U16 index) const
+{
+  TRY(ensureValid(index));
+
+  if(m_pool[index]->GetType() == CPInfo::Type::String)
+    return LookupString(this->Get<StringInfo>(index).Get()->StringIndex);
+
+  auto errOrPtr = this->Get<UTF8Info>(index);
+  VERIFY(errOrPtr, fmt::format("ConstantPool: Failed to lookup string value for "
+        "constant info entry at index {} (type: {})", index, m_pool[index]->GetName()));
+
+  return std::string_view{errOrPtr.Get()->String};
+}
+
+ErrorOr<void> ConstantPool::ensureValid(U16 index) const
 {
   if(index >= m_pool.size() || index == 0)
   {
@@ -129,14 +218,13 @@ ErrorOr<void> ConstantPool::validateIndexAccess(U16 index) const
         "pool is 1-{}", index, this->GetCount())};
   }
 
-  if (m_pool[index].get() == nullptr)
-  {
-    return Error{fmt::format("ConstantPool: " 
-        "nullptr access at index {}", index)};
-  }
+  if(m_pool[index].get() == nullptr)
+    return Error{fmt::format("ConstantPool: pool[{}] is nullptr", index)};
+
+  return NoError{};
 }
 
-ErrorOr<void> ConstantPool::failedCastError(U16 index, std::string_view castToName) const
+Error ConstantPool::failedCastError(U16 index, std::string_view castToName) const
 {
   return Error{fmt::format("ConstantPool: " 
       "invalid type cast access at index {}"

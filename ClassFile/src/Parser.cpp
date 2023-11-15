@@ -379,9 +379,10 @@ ErrorOr< std::unique_ptr<AttributeInfo> > Parser::ParseAttribute(
   U32 len;
   TRY(Read<BigEndian>(stream, nameIndex, len));
 
-  auto nameStr = constPool.GetConstNameOrTypeStr(nameIndex);
+  auto errOrName = constPool.LookupString(nameIndex);
+  VERIFY(errOrName);
 
-  auto errOrType = AttributeInfo::GetType(nameStr);
+  auto errOrType = AttributeInfo::GetType(errOrName.Get());
 
   AttributeInfo::Type type;
   if (errOrType.IsError())

@@ -136,42 +136,48 @@ struct InvokeDynamicInfo : public CPInfo
   U16 NameAndTypeIndex;
 };
 
+//A list container of CPInfos that uses 1-based indexing
 class ConstantPool
 {
   public:
     void Reserve(U16 n);
-
-    //Returns either the name of the constant, if the given const type has a 
-    //name (such as in the case of UTF8 or any class that has a name field 
-    //pointing to a UTF8), OR returns the stringified version of the const type
-    std::string_view GetConstNameOrTypeStr(U16 index) const;
-
     void Add(std::unique_ptr<CPInfo>&& info);
     void Add(CPInfo* info);
 
+    //Succeeds if the index points to any CPInfo with a name or nameandtype index
+    //OR is a UTF8Info or StringInfo itself
+    ErrorOr<std::string_view> LookupString(U16 index) const;
+
+    //Succeeds if the index points to any CPInfo with a descriptor or nameandtype index
+    ErrorOr<std::string_view> LookupDescriptor(U16 index) const;
+
     template <class T = CPInfo>
-    ErrorOr< std::reference_wrapper<T> > Get(U16 index) const
+    ErrorOr<T*> Get(U16 index) const
     {
-      auto errOrValid = validateIndexAccess(index);
-      if(errOrValid.IsError())
-        return errOrValid.GetError();
+      auto err = ensureValid(index);
+      if(err.IsError())
+        return err.GetError();
 
-      T* ptr = dynamic_cast<T*>( m_pool[index].get() );
+      T* cast_ptr = dynamic_cast<T*>( m_pool[index].get() );
 
-      if (ptr == nullptr)
+      if (!cast_ptr)
         return failedCastError(index, typeid(T).name());
 
-      return *ptr;
+      return cast_ptr;
     }
 
+    //if index is OOB then nullptr is returned
     CPInfo* operator[](U16 index);
     const CPInfo* operator[](U16 index) const;
 
     U16 GetSize() const;
     U16 GetCount() const;
+
   private:
-    ErrorOr<void> validateIndexAccess(U16 index) const;
-    ErrorOr<void> failedCastError(U16 index, std::string_view castToName) const;
+    ErrorOr<std::string_view> lookupStringOrUTF8(U16 index) const;
+
+    ErrorOr<void> ensureValid(U16) const;
+    Error failedCastError(U16, std::string_view) const;
 
     std::vector< std::unique_ptr<CPInfo> > m_pool;
 };

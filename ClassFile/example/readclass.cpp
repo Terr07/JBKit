@@ -16,71 +16,19 @@
 
 static bool PrintDetails{false};
 
-void PrintConstInfo(size_t i, const ClassFile::CPInfo& info, const ClassFile::ConstantPool& cp)
+void PrintConstInfo(size_t i, const ClassFile::ConstantPool& cp)
 {
-  std::cout << "ConstPool[" << i << "] = " << info.GetName();
+  std::cout << "ConstPool[" << i << "] = " << cp[i]->GetName();
   using Type = ClassFile::CPInfo::Type;
 
-  if(info.GetType() == Type::UTF8)
-  {
-    std::cout << ": \"";
+  auto errOrString = cp.LookupString(i);
+  auto errOrDesc   = cp.LookupDescriptor(i);
 
-    const auto& utfInfo = static_cast<const ClassFile::UTF8Info&>(info);
+  if(!errOrString.IsError())
+    std::cout << " " << errOrString.Get();
 
-    std::cout << utfInfo.String;
-    std::cout << "\"\n";
-    return;
-  }
-
-  if(info.GetType() == Type::Class)
-  {
-    std::cout << ": \"";
-
-    const auto& classInfo = static_cast<const ClassFile::ClassInfo&>(info);
-    const auto* pConst = cp[classInfo.NameIndex]; assert(pConst != nullptr);
-
-    const auto& UTF8Info = static_cast<const ClassFile::UTF8Info&>(*pConst);
-
-    std::cout << UTF8Info.String;
-    std::cout << "\"\n";
-    return;
-  }
-
-  if(info.GetType() == Type::String)
-  {
-    std::cout << ": \"";
-
-    const auto& stringInfo = static_cast<const ClassFile::StringInfo&>(info);
-    const auto* pConst = cp[stringInfo.StringIndex]; assert(pConst != nullptr);
-
-    const auto& UTF8Info = static_cast<const ClassFile::UTF8Info&>(*pConst);
-
-    std::cout << UTF8Info.String;
-    std::cout << "\"\n";
-    return;
-  }
-
-  if(info.GetType() == Type::NameAndType)
-  {
-    std::cout << ": \"";
-
-    const auto& nameAndTypeInfo = static_cast<const ClassFile::NameAndTypeInfo&>(info);
-    std::cout << cp.GetConstNameOrTypeStr(nameAndTypeInfo.NameIndex);
-    std::cout << "\" ";
-    std::cout << cp.GetConstNameOrTypeStr(nameAndTypeInfo.DescriptorIndex);
-    std::cout << '\n';
-    return;
-  }
-
-  if(info.GetType() == Type::Fieldref)
-  {
-    std::cout << ": ";
-
-    const auto& fieldrefInfo = static_cast<const ClassFile::FieldrefInfo&>(info);
-    std::cout << fieldrefInfo.ClassIndex;
-    std::cout << " (" << cp.GetConstNameOrTypeStr(fieldrefInfo.ClassIndex) << ")\n";
-    return;
-  }
+  if(!errOrDesc.IsError())
+    std::cout << " " << errOrDesc.Get();
 
   std::cout << '\n';
 }
@@ -177,7 +125,7 @@ void PrintConstPool(const ClassFile::ConstantPool& cp)
 
     std::cout << "  ";
 
-    PrintConstInfo(i, *cp[i], cp);
+    PrintConstInfo(i, cp);
 
     if(i+1 == cp.GetCount())
       std::cout << "\n";
@@ -218,9 +166,9 @@ void PrintMethods(const ClassFile::ClassFile& cf)
   for(const auto& method : cf.Methods)
   {
     std::cout << "\n  ";
-    std::cout << cf.ConstPool.GetConstNameOrTypeStr(method.DescriptorIndex);
+    std::cout << cf.ConstPool.LookupString(method.DescriptorIndex).Get();
     std::cout << " - ";
-    std::cout << cf.ConstPool.GetConstNameOrTypeStr(method.NameIndex);
+    std::cout << cf.ConstPool.LookupString(method.NameIndex).Get();
     std::cout << " [";
 
     auto flagStrings = GetMethodFlags(method);
@@ -271,7 +219,7 @@ void PrintFields(const ClassFile::ClassFile& cf)
   for(const auto& field : cf.Fields)
   {
     std::cout << "\n  ";
-    std::cout << cf.ConstPool.GetConstNameOrTypeStr(field.NameIndex);
+    std::cout << cf.ConstPool.LookupString(field.NameIndex).Get();
     std::cout << "(";
 
     //                 same struct, same flags
@@ -286,7 +234,7 @@ void PrintFields(const ClassFile::ClassFile& cf)
     }
 
     std::cout << "): ";
-    std::cout << cf.ConstPool.GetConstNameOrTypeStr(field.DescriptorIndex);
+    std::cout << cf.ConstPool.LookupString(field.DescriptorIndex).Get();
   }
 
   std::cout << "\n";
@@ -304,10 +252,10 @@ void PrintClassInfo(const ClassFile::ClassFile& cf)
   PrintFlags(cf);
 
   std::cout << "ThisClass: ";
-  std::cout << cf.ConstPool.GetConstNameOrTypeStr(cf.ThisClass) << '\n';
+  std::cout << cf.ConstPool.LookupString(cf.ThisClass).Get() << '\n';
 
   std::cout << "SuperClass: ";
-  std::cout << cf.ConstPool.GetConstNameOrTypeStr(cf.SuperClass) << '\n';
+  std::cout << cf.ConstPool.LookupString(cf.SuperClass).Get() << '\n';
 
   std::cout << "Interfaces count: " << cf.Interfaces.size();
 
